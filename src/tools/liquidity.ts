@@ -647,13 +647,14 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
       let result: any;
       try {
         const output = runSdkScript('src/scripts/create-position.ts', {
-          POOL_ADDRESS:  poolAddress,
-          TICK_LOWER:    String(tickLower),
-          TICK_UPPER:    String(tickUpper),
-          BASE_TOKEN:    baseToken,
-          BASE_AMOUNT:   baseAmount,
-          USER_ADDRESS:  userAddress,
-          SLIPPAGE:      slippage || '0.02',
+          POOL_ADDRESS:     poolAddress,
+          TICK_LOWER:       String(tickLower),
+          TICK_UPPER:       String(tickUpper),
+          BASE_TOKEN:       baseToken,
+          BASE_AMOUNT:      baseAmount,
+          USER_ADDRESS:     userAddress,
+          SLIPPAGE:         slippage || '0.02',
+          REFERER_POSITION: positionAddress,  // Copy Farm: memo with referer
         });
         result = JSON.parse(output.trim());
       } catch (err: any) {

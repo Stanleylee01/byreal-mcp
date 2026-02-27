@@ -506,6 +506,7 @@ export function registerLiquidityTools(server, chain) {
                 BASE_AMOUNT: baseAmount,
                 USER_ADDRESS: userAddress,
                 SLIPPAGE: slippage || '0.02',
+                REFERER_POSITION: positionAddress, // Copy Farm: memo with referer
             });
             result = JSON.parse(output.trim());
         }
