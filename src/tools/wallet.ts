@@ -13,6 +13,9 @@ import {
   loadWallet,
   loadConfig,
 } from '../wallet.js';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 
 export function registerWalletTools(server: McpServer, chain: ChainClient) {
 
@@ -68,10 +71,20 @@ export function registerWalletTools(server: McpServer, chain: ChainClient) {
               ``,
               `Address: ${result.address}`,
               ``,
+              `⚠️ IMPORTANT — Back up your private key NOW:`,
+              `Your authorization key is saved at: ~/.byreal-mcp/auth_key.pem`,
+              ``,
+              `🔴 If you lose this file, your wallet becomes PERMANENTLY INACCESSIBLE.`,
+              `   No one — not even us — can recover it.`,
+              ``,
+              `Recommended: copy auth_key.pem to a secure backup location`,
+              `(USB drive, password manager, encrypted cloud storage).`,
+              ``,
               `Next steps:`,
-              `1. Send SOL to this address for gas fees (~0.01 SOL minimum)`,
-              `2. Send USDC for trading/LP operations`,
-              `3. Use byreal_wallet_status to check your balance`,
+              `1. Back up ~/.byreal-mcp/auth_key.pem (seriously, do it now)`,
+              `2. Send SOL to this address for gas fees (~0.01 SOL minimum)`,
+              `3. Send USDC for trading/LP operations`,
+              `4. Use byreal_wallet_status to check your balance`,
               ``,
               `Your wallet is now ready. All trading and LP operations will auto-sign.`,
             ].join('\n'),
@@ -123,6 +136,8 @@ export function registerWalletTools(server: McpServer, chain: ChainClient) {
         }
 
         const bal = status.balance;
+        const authKeyPath = join(homedir(), '.byreal-mcp', 'auth_key.pem');
+        const hasAuthKey = existsSync(authKeyPath);
         return {
           content: [{
             type: 'text' as const,
@@ -134,6 +149,10 @@ export function registerWalletTools(server: McpServer, chain: ChainClient) {
               bal ? `SOL: ${bal.sol.toFixed(6)}` : '',
               bal ? `USDC: ${bal.usdc.toFixed(2)}` : '',
               bal ? `Gas: ${bal.sol >= 0.01 ? '✅ Sufficient' : '⚠️ Low — send at least 0.01 SOL'}` : '',
+              ``,
+              `🔑 Auth Key: ${hasAuthKey ? `✅ Found at ${authKeyPath}` : '❌ MISSING — wallet cannot sign transactions!'}`,
+              !hasAuthKey ? `   ⚠️ If you have a backup, restore it to ${authKeyPath}` : '',
+              hasAuthKey ? `   💡 Reminder: keep a secure backup of this file. Loss = permanent wallet lockout.` : '',
             ].filter(Boolean).join('\n'),
           }],
         };
