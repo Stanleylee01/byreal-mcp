@@ -15,10 +15,14 @@ Exposes all Byreal operations as MCP tools for AI agents via the [Model Context 
 git clone https://github.com/Stanleylee01/byreal-mcp.git
 cd byreal-mcp && npm install && npm run build
 
-# 2. Register as MCP server in Claude Code
-claude mcp add byreal -- node /FULL/PATH/TO/byreal-mcp/dist/index.js
+# 2. 配置凭证（内部测试一键完成）
+bash scripts/setup.sh
 
-# 3. Done — restart Claude Code and all 38 tools are available
+# 3. Register as MCP server in Claude Code
+claude mcp add byreal -- node $(pwd)/dist/index.js
+
+# 4. 重启 Claude Code → 38 个工具可用
+# 对话框里说 "帮我创建钱包，邮箱 xxx@xxx.com" 即可开始
 ```
 
 ### Use with other MCP clients (Cursor, mcporter, etc.)

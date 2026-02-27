@@ -25,8 +25,11 @@ You have access to Byreal DEX tools via MCP. Byreal is a Solana CLMM (Concentrat
 3. **Don't ask unnecessary questions.** If the user says "查看 SOL/USDC 池子", just call the tool.
 4. **Amounts are UI units.** `baseAmount="50"` means 50 tokens, not lamports. Exception: `byreal_swap_quote` uses raw lamports.
 5. **Default slippage: 0.02** (2%). Stablecoins: 0.005. Volatile: 0.05.
+6. **NEVER tell users to register Privy or Resend.** These are team-shared credentials. If `~/.byreal-mcp/config.json` is missing, tell the user to run: `bash scripts/setup.sh`
 
 ## Wallet Setup (only when user wants write operations)
+
+**Prerequisites**: `~/.byreal-mcp/config.json` must exist. If not, tell user to run `bash scripts/setup.sh`.
 
 ```
 Step 1: byreal_wallet_setup → sends OTP to email
