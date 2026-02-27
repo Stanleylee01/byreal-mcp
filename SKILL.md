@@ -133,9 +133,10 @@ No manual signing needed. The `userAddress` must match the configured wallet.
 
 ### Wallet Security Model
 - **Privy MPC**: Private key is split across Privy's infrastructure. No single party has the full key.
-- **App-level control**: The Privy App admin (holder of App ID + Secret) can sign transactions for wallets created without an owner.
-- **Not self-custodial**: Users cannot export the private key to external wallets (Phantom, etc.).
-- **Suitable for**: MCP/agent-driven operations where the app manages funds on behalf of the user.
+- **User-owned**: Each wallet has a P-256 authorization key. The private key (`~/.byreal-mcp/auth_key.pem`) is stored locally on the user's machine. Without this key, nobody — not even the app admin — can sign transactions.
+- **Dual authorization**: Signing requires BOTH Privy App credentials (Basic Auth) AND the user's authorization key signature. Compromising either alone is insufficient.
+- **Not self-custodial in the traditional sense**: Users cannot export the Solana private key to Phantom. But the authorization key gives them exclusive control over signing.
+- **Back up auth_key.pem**: If lost, the wallet becomes inaccessible. There is no recovery mechanism.
 
 ## Common Workflows
 
