@@ -8,27 +8,51 @@ Exposes all Byreal operations as MCP tools for AI agents via the [Model Context 
 
 ## Quick Start
 
+### Use with Claude Code
+
 ```bash
-# Install deps
-npm install
+# 1. Clone & install
+git clone https://github.com/Stanleylee01/byreal-mcp.git
+cd byreal-mcp && npm install && npm run build
 
-# Build
-npm run build
+# 2. Register as MCP server in Claude Code
+claude mcp add byreal -- node /FULL/PATH/TO/byreal-mcp/dist/index.js
 
-# Run server (stdio)
-node dist/index.js
+# 3. Done — restart Claude Code and all 38 tools are available
+```
 
-# Dev mode (no build needed)
-npx tsx src/index.ts
+### Use with other MCP clients (Cursor, mcporter, etc.)
 
-# Register with mcporter
+```bash
+# mcporter
 mcporter config add byreal --stdio "node /path/to/byreal-mcp/dist/index.js"
-
-# Test
 mcporter list byreal
 mcporter call byreal.byreal_global_overview
-mcporter call byreal.byreal_swap_quote --args '{"inputMint":"So11111111111111111111111111111111111111112","outputMint":"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v","amount":"1000000000"}'
+
+# Cursor — add to .cursor/mcp.json:
+# { "byreal": { "command": "node", "args": ["/path/to/byreal-mcp/dist/index.js"] } }
 ```
+
+### Wallet Setup (optional — enables auto-sign for write operations)
+
+```bash
+mkdir -p ~/.byreal-mcp
+cat > ~/.byreal-mcp/config.json << 'EOF'
+{
+  "privyAppId": "ask Stanley for credentials",
+  "privyAppSecret": "...",
+  "resendApiKey": "...",
+  "rpcUrl": "https://your-helius-or-other-rpc.com"
+}
+EOF
+
+# Then in Claude Code:
+#   byreal_wallet_setup → enter email → get OTP
+#   byreal_wallet_verify → enter code → wallet created
+#   ⚠️ Back up ~/.byreal-mcp/auth_key.pem — lose it = lose wallet forever
+```
+
+> **Read-only tools work without wallet config.** Wallet is only needed for swap/LP/copy operations.
 
 ## Environment Variables
 
@@ -215,20 +239,18 @@ byreal-mcp/
 
 ## Roadmap
 
-### v0.3 ✅ Current
-- All 34 tools operational
+### v0.4 ✅ Current
+- 38 tools operational
 - CLMM open/close/add/remove via SDK subprocesses
 - Copy Farm with REFERER_POSITION memo (verified on mainnet)
 - Fee collection and reward claim workflows
 - CopyFarmer leaderboards and overview
+- Wallet onboarding (email OTP + Privy MPC + P-256 auth key)
+- Auto-sign for all write operations
 
-### v0.4
+### v0.5
 - Reset Launchpad integration
 - Position auto-rebalance (tick drift detection)
 - Portfolio summary (all positions + PnL aggregated)
-- Streaming price alerts via SSE transport
-
-### v0.5
 - Strategy recommendations (optimal range, fee tier selection)
-- Multi-position batch operations
-- Historical APR backtester
+- Transaction spending limits for auto-sign safety
