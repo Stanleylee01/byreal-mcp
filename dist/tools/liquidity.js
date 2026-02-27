@@ -10,10 +10,58 @@
  */
 import { z } from 'zod';
 import { apiFetch, apiPost } from '../config.js';
+import { loadWallet, loadConfig, signAndSend } from '../wallet.js';
 import { execSync } from 'child_process';
 import * as path from 'path';
 const API_BASE = process.env.BYREAL_API_BASE || 'https://api2.byreal.io/byreal/api';
 const SDK_DIR = path.resolve(import.meta.dirname ?? __dirname, '../../sdk-ref');
+/**
+ * Try to auto-sign and broadcast. Returns signature if wallet is configured, null otherwise.
+ */
+/**
+ * Get wallet address if configured, for auto-filling userAddress params
+ */
+function getWalletAddress() {
+    const wallet = loadWallet();
+    return wallet?.address ?? null;
+}
+async function tryAutoSign(unsignedTx) {
+    const config = loadConfig();
+    const wallet = loadWallet();
+    if (!config || !wallet)
+        return null;
+    try {
+        const result = await signAndSend(unsignedTx);
+        return result.signature;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Format the output for a write operation — auto-sign if possible, otherwise return unsigned tx
+ */
+async function formatWriteResult(unsignedTx, details) {
+    const sig = await tryAutoSign(unsignedTx);
+    if (sig) {
+        return [
+            details,
+            ``,
+            `✅ Transaction signed and confirmed!`,
+            `Signature: ${sig}`,
+            `Explorer: https://solscan.io/tx/${sig}`,
+        ].join('\n');
+    }
+    return [
+        details,
+        ``,
+        `--- Unsigned Transaction (base64) ---`,
+        unsignedTx,
+        ``,
+        `⚠️ No wallet configured. Sign manually or run byreal_wallet_setup first.`,
+        `After signing, submit via byreal_sign_and_send.`,
+    ].join('\n');
+}
 /**
  * Run an SDK script and return its parsed JSON output
  */
@@ -280,31 +328,23 @@ export function registerLiquidityTools(server, chain) {
             if (result.error) {
                 return { content: [{ type: 'text', text: `Error: ${result.error}` }], isError: true };
             }
-            return {
-                content: [{
-                        type: 'text',
-                        text: [
-                            `Open Position Transaction Built`,
-                            ``,
-                            `Pool: ${result.poolAddress}`,
-                            `Token A: ${result.mintA}`,
-                            `Token B: ${result.mintB}`,
-                            `Price range: ${result.priceLower} — ${result.priceUpper}`,
-                            `Tick range: ${result.tickLower} — ${result.tickUpper}`,
-                            ``,
-                            `Estimated amounts:`,
-                            `  Token A: ${result.estimatedAmountA}`,
-                            `  Token B: ${result.estimatedAmountB}`,
-                            ``,
-                            `NFT Mint (position address): ${result.nftAddress}`,
-                            ``,
-                            `--- Unsigned Transaction (base64) ---`,
-                            result.unsignedTx,
-                            ``,
-                            `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
-                        ].join('\n'),
-                    }],
-            };
+            const details = [
+                `Open Position Transaction Built`,
+                ``,
+                `Pool: ${result.poolAddress}`,
+                `Token A: ${result.mintA}`,
+                `Token B: ${result.mintB}`,
+                `Price range: ${result.priceLower} — ${result.priceUpper}`,
+                `Tick range: ${result.tickLower} — ${result.tickUpper}`,
+                ``,
+                `Estimated amounts:`,
+                `  Token A: ${result.estimatedAmountA}`,
+                `  Token B: ${result.estimatedAmountB}`,
+                ``,
+                `NFT Mint (position address): ${result.nftAddress}`,
+            ].join('\n');
+            const text = await formatWriteResult(result.unsignedTx, details);
+            return { content: [{ type: 'text', text }] };
         }
         catch (err) {
             const msg = err.stderr || err.message || String(err);
@@ -329,32 +369,24 @@ export function registerLiquidityTools(server, chain) {
                 return { content: [{ type: 'text', text: `Error: ${result.error}` }], isError: true };
             }
             const pos = result.positionInfo;
-            return {
-                content: [{
-                        type: 'text',
-                        text: [
-                            `Close Position Transaction Built`,
-                            ``,
-                            `Position NFT: ${pos.nftMint}`,
-                            `Pool: ${pos.poolAddress}`,
-                            `Token A: ${pos.mintA}`,
-                            `Token B: ${pos.mintB}`,
-                            ``,
-                            `Position details:`,
-                            `  Price range: ${pos.priceLower} — ${pos.priceUpper}`,
-                            `  Current amount A: ${pos.amountA}`,
-                            `  Current amount B: ${pos.amountB}`,
-                            `  Unclaimed fee A: ${pos.feeAmountA}`,
-                            `  Unclaimed fee B: ${pos.feeAmountB}`,
-                            `  Close position: ${pos.closePosition}`,
-                            ``,
-                            `--- Unsigned Transaction (base64) ---`,
-                            result.unsignedTx,
-                            ``,
-                            `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
-                        ].join('\n'),
-                    }],
-            };
+            const details = [
+                `Close Position Transaction Built`,
+                ``,
+                `Position NFT: ${pos.nftMint}`,
+                `Pool: ${pos.poolAddress}`,
+                `Token A: ${pos.mintA}`,
+                `Token B: ${pos.mintB}`,
+                ``,
+                `Position details:`,
+                `  Price range: ${pos.priceLower} — ${pos.priceUpper}`,
+                `  Current amount A: ${pos.amountA}`,
+                `  Current amount B: ${pos.amountB}`,
+                `  Unclaimed fee A: ${pos.feeAmountA}`,
+                `  Unclaimed fee B: ${pos.feeAmountB}`,
+                `  Close position: ${pos.closePosition}`,
+            ].join('\n');
+            const text = await formatWriteResult(result.unsignedTx, details);
+            return { content: [{ type: 'text', text }] };
         }
         catch (err) {
             const msg = err.stderr || err.message || String(err);
@@ -381,31 +413,23 @@ export function registerLiquidityTools(server, chain) {
                 return { content: [{ type: 'text', text: `Error: ${result.error}` }], isError: true };
             }
             const pos = result.positionInfo;
-            return {
-                content: [{
-                        type: 'text',
-                        text: [
-                            `Add Liquidity Transaction Built`,
-                            ``,
-                            `Position NFT: ${pos.nftMint}`,
-                            `Pool: ${pos.poolAddress}`,
-                            `Price range: ${pos.priceLower} — ${pos.priceUpper}`,
-                            ``,
-                            `Current position:`,
-                            `  Token A: ${pos.currentAmountA}`,
-                            `  Token B: ${pos.currentAmountB}`,
-                            ``,
-                            `Adding:`,
-                            `  Token A: ${result.estimatedAmountA}`,
-                            `  Token B: ${result.estimatedAmountB}`,
-                            ``,
-                            `--- Unsigned Transaction (base64) ---`,
-                            result.unsignedTx,
-                            ``,
-                            `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
-                        ].join('\n'),
-                    }],
-            };
+            const details = [
+                `Add Liquidity Transaction Built`,
+                ``,
+                `Position NFT: ${pos.nftMint}`,
+                `Pool: ${pos.poolAddress}`,
+                `Price range: ${pos.priceLower} — ${pos.priceUpper}`,
+                ``,
+                `Current position:`,
+                `  Token A: ${pos.currentAmountA}`,
+                `  Token B: ${pos.currentAmountB}`,
+                ``,
+                `Adding:`,
+                `  Token A: ${result.estimatedAmountA}`,
+                `  Token B: ${result.estimatedAmountB}`,
+            ].join('\n');
+            const text = await formatWriteResult(result.unsignedTx, details);
+            return { content: [{ type: 'text', text }] };
         }
         catch (err) {
             const msg = err.stderr || err.message || String(err);
@@ -430,32 +454,24 @@ export function registerLiquidityTools(server, chain) {
                 return { content: [{ type: 'text', text: `Error: ${result.error}` }], isError: true };
             }
             const pos = result.positionInfo;
-            return {
-                content: [{
-                        type: 'text',
-                        text: [
-                            `Remove Liquidity Transaction Built`,
-                            ``,
-                            `Position NFT: ${pos.nftMint}`,
-                            `Pool: ${pos.poolAddress}`,
-                            `Price range: ${pos.priceLower} — ${pos.priceUpper}`,
-                            ``,
-                            `Current position:`,
-                            `  Token A: ${pos.currentAmountA}`,
-                            `  Token B: ${pos.currentAmountB}`,
-                            ``,
-                            `Removing ${result.liquidityPercent}% of liquidity:`,
-                            `  Expected Token A: ~${result.expectedAmountA}`,
-                            `  Expected Token B: ~${result.expectedAmountB}`,
-                            `  Liquidity: ${result.liquidityToRemove} / ${result.totalLiquidity}`,
-                            ``,
-                            `--- Unsigned Transaction (base64) ---`,
-                            result.unsignedTx,
-                            ``,
-                            `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
-                        ].join('\n'),
-                    }],
-            };
+            const details = [
+                `Remove Liquidity Transaction Built`,
+                ``,
+                `Position NFT: ${pos.nftMint}`,
+                `Pool: ${pos.poolAddress}`,
+                `Price range: ${pos.priceLower} — ${pos.priceUpper}`,
+                ``,
+                `Current position:`,
+                `  Token A: ${pos.currentAmountA}`,
+                `  Token B: ${pos.currentAmountB}`,
+                ``,
+                `Removing ${result.liquidityPercent}% of liquidity:`,
+                `  Expected Token A: ~${result.expectedAmountA}`,
+                `  Expected Token B: ~${result.expectedAmountB}`,
+                `  Liquidity: ${result.liquidityToRemove} / ${result.totalLiquidity}`,
+            ].join('\n');
+            const text = await formatWriteResult(result.unsignedTx, details);
+            return { content: [{ type: 'text', text }] };
         }
         catch (err) {
             const msg = err.stderr || err.message || String(err);
@@ -513,31 +529,23 @@ export function registerLiquidityTools(server, chain) {
             const msg = err.stderr || err.message || String(err);
             return { content: [{ type: 'text', text: `SDK Error building tx: ${msg}` }], isError: true };
         }
-        return {
-            content: [{
-                    type: 'text',
-                    text: [
-                        `📋 Copy Position — ${symA}/${symB}`,
-                        ``,
-                        `Copying: ${positionAddress}`,
-                        `Original farmer: ${posDetail.providerAddress ?? '?'}`,
-                        `Original PnL: $${Number(posDetail.pnlUsd ?? 0).toFixed(2)} (${(Number(posDetail.pnlUsdPercent ?? 0) * 100).toFixed(2)}%)`,
-                        ``,
-                        `Your new position:`,
-                        `Pool: ${poolAddress}`,
-                        `Price range: ${result.priceLower} — ${result.priceUpper}`,
-                        `Ticks: ${result.tickLower} — ${result.tickUpper}`,
-                        `Est. ${symA}: ${result.estimatedAmountA}`,
-                        `Est. ${symB}: ${result.estimatedAmountB}`,
-                        `NFT address: ${result.nftAddress}`,
-                        ``,
-                        `--- Unsigned Transaction (base64) ---`,
-                        result.unsignedTx,
-                        ``,
-                        `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
-                    ].join('\n'),
-                }],
-        };
+        const details = [
+            `📋 Copy Position — ${symA}/${symB}`,
+            ``,
+            `Copying: ${positionAddress}`,
+            `Original farmer: ${posDetail.providerAddress ?? '?'}`,
+            `Original PnL: $${Number(posDetail.pnlUsd ?? 0).toFixed(2)} (${(Number(posDetail.pnlUsdPercent ?? 0) * 100).toFixed(2)}%)`,
+            ``,
+            `Your new position:`,
+            `Pool: ${poolAddress}`,
+            `Price range: ${result.priceLower} — ${result.priceUpper}`,
+            `Ticks: ${result.tickLower} — ${result.tickUpper}`,
+            `Est. ${symA}: ${result.estimatedAmountA}`,
+            `Est. ${symB}: ${result.estimatedAmountB}`,
+            `NFT address: ${result.nftAddress}`,
+        ].join('\n');
+        const text = await formatWriteResult(result.unsignedTx, details);
+        return { content: [{ type: 'text', text }] };
     });
 }
 //# sourceMappingURL=liquidity.js.map

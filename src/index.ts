@@ -17,6 +17,7 @@ import { registerMarketTools } from './tools/market.js';
 import { registerCopyfarmerTools } from './tools/copyfarmer.js';
 import { registerOrderTools } from './tools/orders.js';
 import { registerLiquidityTools } from './tools/liquidity.js';
+import { registerWalletTools } from './tools/wallet.js';
 import { createChain } from './config.js';
 
 const server = new McpServer({
@@ -35,6 +36,7 @@ registerMarketTools(server, chain);
 registerCopyfarmerTools(server, chain);
 registerOrderTools(server, chain);
 registerLiquidityTools(server, chain);
+registerWalletTools(server, chain);
 
 async function main() {
   const transport = new StdioServerTransport();

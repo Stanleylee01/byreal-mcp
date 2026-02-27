@@ -9,6 +9,7 @@
  */
 import { z } from 'zod';
 import { API_ENDPOINTS, apiPost, KNOWN_TOKENS } from '../config.js';
+import { loadWallet, loadConfig, signAndSend } from '../wallet.js';
 function tokenLabel(mint) {
     return KNOWN_TOKENS[mint]?.symbol || mint.slice(0, 8) + '...';
 }
@@ -79,6 +80,26 @@ export function registerSwapTools(server, chain) {
         const inSym = tokenLabel(inputMint);
         const outSym = tokenLabel(outputMint);
         const outAmt = toUi(data.outAmount, outputMint);
+        // Try auto-sign if wallet is configured
+        const config = loadConfig();
+        const wallet = loadWallet();
+        if (config && wallet) {
+            try {
+                const result = await signAndSend(data.transaction);
+                return {
+                    content: [{
+                            type: 'text',
+                            text: [
+                                `✅ Swap executed: ${inSym} → ${outAmt.toFixed(6)} ${outSym}`,
+                                `Price impact: ${(data.priceImpactPct).toFixed(4)}%`,
+                                `Signature: ${result.signature}`,
+                                `Explorer: https://solscan.io/tx/${result.signature}`,
+                            ].join('\n'),
+                        }],
+                };
+            }
+            catch { }
+        }
         return {
             content: [{
                     type: 'text',
@@ -90,7 +111,7 @@ export function registerSwapTools(server, chain) {
                         `Transaction (base64):`,
                         data.transaction,
                         ``,
-                        `⚠️ UNSIGNED — sign with your wallet before broadcasting.`,
+                        `⚠️ No wallet configured. Sign manually or run byreal_wallet_setup first.`,
                     ].join('\n'),
                 }],
         };

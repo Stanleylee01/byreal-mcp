@@ -11,6 +11,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ChainClient, API_ENDPOINTS, apiPost, KNOWN_TOKENS } from '../config.js';
+import { loadWallet, loadConfig, signAndSend } from '../wallet.js';
 
 interface SwapResult {
   inputMint: string;
@@ -110,6 +111,26 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
       const outSym = tokenLabel(outputMint);
       const outAmt = toUi(data.outAmount, outputMint);
 
+      // Try auto-sign if wallet is configured
+      const config = loadConfig();
+      const wallet = loadWallet();
+      if (config && wallet) {
+        try {
+          const result = await signAndSend(data.transaction);
+          return {
+            content: [{
+              type: 'text' as const,
+              text: [
+                `✅ Swap executed: ${inSym} → ${outAmt.toFixed(6)} ${outSym}`,
+                `Price impact: ${(data.priceImpactPct).toFixed(4)}%`,
+                `Signature: ${result.signature}`,
+                `Explorer: https://solscan.io/tx/${result.signature}`,
+              ].join('\n'),
+            }],
+          };
+        } catch {}
+      }
+
       return {
         content: [{
           type: 'text' as const,
@@ -121,7 +142,7 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
             `Transaction (base64):`,
             data.transaction,
             ``,
-            `⚠️ UNSIGNED — sign with your wallet before broadcasting.`,
+            `⚠️ No wallet configured. Sign manually or run byreal_wallet_setup first.`,
           ].join('\n'),
         }],
       };
