@@ -1,0 +1,7 @@
+{
+  "name": "@byreal/clmm-sdk-dist",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Compiled Byreal CLMM SDK scripts (no source)"
+}

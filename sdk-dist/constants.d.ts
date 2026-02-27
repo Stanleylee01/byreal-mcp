@@ -1,0 +1,18 @@
+import { PublicKey } from '@solana/web3.js';
+import BN from 'bn.js';
+export declare const TICK_ARRAY_SIZE = 60;
+export declare const TICK_ARRAY_BITMAP_SIZE = 512;
+export declare const EXTENSION_TICKARRAY_BITMAP_SIZE = 14;
+export declare const DYN_TICK_ARRAY_STRUCT_LEN = 208;
+export declare const DYN_TICK_ARRAY_HEADER_LEN = 216;
+export declare const TICK_STATE_LEN = 168;
+export declare const U64_IGNORE_RANGE: BN;
+export declare const BYREAL_CLMM_PROGRAM_ID: PublicKey;
+export declare const MEMO_PROGRAM_ID: PublicKey;
+export declare const RENT_PROGRAM_ID: PublicKey;
+export declare const CLOCK_PROGRAM_ID: PublicKey;
+export declare const METADATA_PROGRAM_ID: PublicKey;
+export declare const INSTRUCTION_PROGRAM_ID: PublicKey;
+export declare const WSOLMint: PublicKey;
+export declare const SOLMint: PublicKey;
+export declare const SYSTEM_PROGRAM_ID: PublicKey;

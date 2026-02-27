@@ -17,7 +17,8 @@ import { execSync } from 'child_process';
 import * as path from 'path';
 
 const API_BASE = process.env.BYREAL_API_BASE || 'https://api2.byreal.io/byreal/api';
-const SDK_DIR = path.resolve(import.meta.dirname ?? __dirname, '../../sdk-ref');
+// SDK dist: compiled JS scripts (no TypeScript source needed)
+const SDK_DIST_DIR = path.resolve(import.meta.dirname ?? __dirname, '../../sdk-dist');
 
 /**
  * Try to auto-sign and broadcast. Returns signature if wallet is configured, null otherwise.
@@ -80,8 +81,12 @@ function runSdkScript(script: string, env: Record<string, string> = {}): string 
     SOL_ENDPOINT: process.env.SOL_RPC || process.env.SOL_ENDPOINT || 'https://api.mainnet-beta.solana.com',
   };
 
-  return execSync(`npx tsx --import ./src/scripts/proxy-setup.ts ${script}`, {
-    cwd: SDK_DIR,
+  // Use compiled JS scripts from sdk-dist (no tsx needed)
+  // Convert src/scripts/xxx.ts → scripts/xxx.js
+  const jsScript = script.replace('src/scripts/', 'scripts/').replace('.ts', '.js');
+  const scriptPath = path.join(SDK_DIST_DIR, jsScript);
+  return execSync(`node --import ${path.join(SDK_DIST_DIR, 'scripts/proxy-setup.js')} ${scriptPath}`, {
+    cwd: SDK_DIST_DIR,
     env: fullEnv,
     timeout: 60000,
     encoding: 'utf-8',
