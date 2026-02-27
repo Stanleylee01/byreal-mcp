@@ -22,12 +22,14 @@ const canonicalize = (canonicalizeModule as any).default || canonicalizeModule;
 
 // Proxy support: Node.js fetch doesn't respect system proxy
 const PROXY_URL = process.env.HTTPS_PROXY || process.env.https_proxy;
+let _proxyInitialized = false;
 
 async function proxyFetch(url: string, init: RequestInit): Promise<Response> {
-  if (PROXY_URL) {
+  if (PROXY_URL && !_proxyInitialized) {
     try {
       const { ProxyAgent, setGlobalDispatcher } = await import('undici');
       setGlobalDispatcher(new ProxyAgent(PROXY_URL));
+      _proxyInitialized = true;
     } catch {
       // undici not available, try without proxy
     }
