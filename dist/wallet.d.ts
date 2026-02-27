@@ -17,6 +17,7 @@ export interface WalletConfig {
     resendApiKey: string;
     resendFrom?: string;
     rpcUrl?: string;
+    authorizationKeyPem?: string;
 }
 export interface WalletInfo {
     userId: string;

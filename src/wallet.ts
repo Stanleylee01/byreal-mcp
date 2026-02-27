@@ -18,6 +18,21 @@ import * as os from 'os';
 import * as crypto from 'crypto';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 
+// Proxy support: Node.js fetch doesn't respect system proxy
+const PROXY_URL = process.env.HTTPS_PROXY || process.env.https_proxy;
+
+async function proxyFetch(url: string, init: RequestInit): Promise<Response> {
+  if (PROXY_URL) {
+    try {
+      const { ProxyAgent, setGlobalDispatcher } = await import('undici');
+      setGlobalDispatcher(new ProxyAgent(PROXY_URL));
+    } catch {
+      // undici not available, try without proxy
+    }
+  }
+  return fetch(url, init);
+}
+
 // ==================== Paths ====================
 
 const CONFIG_DIR = path.join(os.homedir(), '.byreal-mcp');
@@ -35,6 +50,7 @@ export interface WalletConfig {
   resendApiKey: string;
   resendFrom?: string;        // e.g. "Byreal <noreply@yourdomain.com>"
   rpcUrl?: string;
+  authorizationKeyPem?: string;  // P-256 private key in PEM format for signing wallet RPC requests
 }
 
 export interface WalletInfo {
@@ -132,7 +148,7 @@ function privyHeaders(config: WalletConfig) {
 }
 
 async function privyCreateUser(config: WalletConfig, email: string): Promise<{ id: string }> {
-  const res = await fetch(`${PRIVY_API}/v1/users`, {
+  const res = await proxyFetch(`${PRIVY_API}/v1/users`, {
     method: 'POST',
     headers: privyHeaders(config),
     body: JSON.stringify({
@@ -149,12 +165,11 @@ async function privyCreateUser(config: WalletConfig, email: string): Promise<{ i
 }
 
 async function privyCreateWallet(config: WalletConfig, userId: string): Promise<{ id: string; address: string }> {
-  const res = await fetch(`${PRIVY_API}/v1/wallets`, {
+  const res = await proxyFetch(`${PRIVY_API}/v1/wallets`, {
     method: 'POST',
     headers: privyHeaders(config),
     body: JSON.stringify({
       chain_type: 'solana',
-      owner: { user_id: userId },
     }),
   });
 
@@ -166,14 +181,65 @@ async function privyCreateWallet(config: WalletConfig, userId: string): Promise<
   return res.json() as any;
 }
 
+/**
+ * Compute privy-authorization-signature header for wallets with an owner.
+ * Privy requires signing a structured payload (not just the body).
+ * See: https://docs.privy.io/controls/authorization-keys/using-owners/sign/direct-implementation
+ */
+function computeAuthorizationSignature(
+  config: WalletConfig,
+  method: string,
+  url: string,
+  body: any,
+  privyHeaders: Record<string, string>,
+): string | null {
+  const pemKey = config.authorizationKeyPem;
+  if (!pemKey) return null;
+
+  const privateKey = crypto.createPrivateKey({ key: pemKey, format: 'pem' });
+
+  // Build the signature payload per Privy spec
+  const signaturePayload = {
+    version: 1,
+    method: method.toUpperCase(),
+    url,
+    body,
+    headers: {
+      'privy-app-id': privyHeaders['privy-app-id'] || config.privyAppId,
+    },
+  };
+
+  const payloadStr = JSON.stringify(signaturePayload);
+  const payloadBuf = Buffer.from(payloadStr);
+
+  // Sign with P-256 / SHA-256, ieee-p1363 encoding (raw r||s, 64 bytes)
+  const rawSig = crypto.sign('sha256', payloadBuf, {
+    key: privateKey,
+    dsaEncoding: 'ieee-p1363',
+  });
+
+  return rawSig.toString('base64');
+}
+
 async function privySignTransaction(config: WalletConfig, walletId: string, unsignedTxB64: string): Promise<Buffer> {
-  const res = await fetch(`${PRIVY_API}/v1/wallets/${walletId}/rpc`, {
+  const body = {
+    method: 'signTransaction',
+    params: { transaction: unsignedTxB64, encoding: 'base64' },
+  };
+
+  const url = `${PRIVY_API}/v1/wallets/${walletId}/rpc`;
+  const hdrs = privyHeaders(config);
+
+  // Add authorization signature if auth key is available
+  const authSig = computeAuthorizationSignature(config, 'POST', url, body, hdrs);
+  if (authSig) {
+    (hdrs as any)['privy-authorization-signature'] = authSig;
+  }
+
+  const res = await proxyFetch(url, {
     method: 'POST',
-    headers: privyHeaders(config),
-    body: JSON.stringify({
-      method: 'signTransaction',
-      params: { transaction: unsignedTxB64, encoding: 'base64' },
-    }),
+    headers: hdrs,
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
@@ -198,7 +264,7 @@ function generateOTP(): string {
 async function sendOTPEmail(config: WalletConfig, email: string, code: string): Promise<void> {
   const from = config.resendFrom || 'Byreal <onboarding@resend.dev>';
 
-  const res = await fetch('https://api.resend.com/emails', {
+  const res = await proxyFetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
