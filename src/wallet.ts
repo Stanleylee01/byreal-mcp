@@ -17,6 +17,8 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
+import * as canonicalizeModule from 'canonicalize';
+const canonicalize = (canonicalizeModule as any).default || canonicalizeModule;
 
 // Proxy support: Node.js fetch doesn't respect system proxy
 const PROXY_URL = process.env.HTTPS_PROXY || process.env.https_proxy;
@@ -39,6 +41,7 @@ const CONFIG_DIR = path.join(os.homedir(), '.byreal-mcp');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const WALLET_FILE = path.join(CONFIG_DIR, 'wallet.json');
 const OTP_FILE = path.join(CONFIG_DIR, 'pending_otp.json');
+const AUTH_KEY_FILE = path.join(CONFIG_DIR, 'auth_key.pem');
 
 const PRIVY_API = 'https://api.privy.io';
 
@@ -164,12 +167,47 @@ async function privyCreateUser(config: WalletConfig, email: string): Promise<{ i
   return res.json() as any;
 }
 
-async function privyCreateWallet(config: WalletConfig, userId: string): Promise<{ id: string; address: string }> {
+/**
+ * Generate a P-256 key pair for wallet authorization.
+ * Private key is stored locally; public key is sent to Privy as the wallet owner.
+ * This ensures only the holder of auth_key.pem can sign transactions.
+ */
+function generateAuthorizationKey(): { privateKeyPem: string; publicKeySpkiBase64: string } {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', {
+    namedCurve: 'P-256',
+  });
+
+  const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+  const publicKeyDer = publicKey.export({ type: 'spki', format: 'der' });
+  const publicKeySpkiBase64 = publicKeyDer.toString('base64');
+
+  return { privateKeyPem, publicKeySpkiBase64 };
+}
+
+function saveAuthKey(pem: string) {
+  ensureDir();
+  fs.writeFileSync(AUTH_KEY_FILE, pem, { mode: 0o600 }); // owner-only read/write
+}
+
+function loadAuthKeyPem(): string | null {
+  try {
+    if (fs.existsSync(AUTH_KEY_FILE)) {
+      return fs.readFileSync(AUTH_KEY_FILE, 'utf-8');
+    }
+  } catch {}
+  return null;
+}
+
+async function privyCreateWallet(config: WalletConfig): Promise<{ id: string; address: string; authKeyPem: string }> {
+  // Generate authorization key — user-owned, stored locally
+  const { privateKeyPem, publicKeySpkiBase64 } = generateAuthorizationKey();
+
   const res = await proxyFetch(`${PRIVY_API}/v1/wallets`, {
     method: 'POST',
     headers: privyHeaders(config),
     body: JSON.stringify({
       chain_type: 'solana',
+      owner: { public_key: publicKeySpkiBase64 },
     }),
   });
 
@@ -178,7 +216,12 @@ async function privyCreateWallet(config: WalletConfig, userId: string): Promise<
     throw new Error(`Privy create wallet failed (${res.status}): ${text}`);
   }
 
-  return res.json() as any;
+  const data = await res.json() as any;
+
+  // Save auth key locally — this is the user's ownership proof
+  saveAuthKey(privateKeyPem);
+
+  return { id: data.id, address: data.address, authKeyPem: privateKeyPem };
 }
 
 /**
@@ -193,7 +236,7 @@ function computeAuthorizationSignature(
   body: any,
   privyHeaders: Record<string, string>,
 ): string | null {
-  const pemKey = config.authorizationKeyPem;
+  const pemKey = config.authorizationKeyPem || loadAuthKeyPem();
   if (!pemKey) return null;
 
   const privateKey = crypto.createPrivateKey({ key: pemKey, format: 'pem' });
@@ -209,16 +252,14 @@ function computeAuthorizationSignature(
     },
   };
 
-  const payloadStr = JSON.stringify(signaturePayload);
-  const payloadBuf = Buffer.from(payloadStr);
+  // JSON-canonicalize per RFC 8785 (sorted keys, no whitespace)
+  const canonicalized = canonicalize(signaturePayload) as string;
+  const payloadBuf = Buffer.from(canonicalized);
 
-  // Sign with P-256 / SHA-256, ieee-p1363 encoding (raw r||s, 64 bytes)
-  const rawSig = crypto.sign('sha256', payloadBuf, {
-    key: privateKey,
-    dsaEncoding: 'ieee-p1363',
-  });
+  // Sign with P-256 / SHA-256 — DER encoding (Privy expects DER base64)
+  const derSig = crypto.sign('sha256', payloadBuf, privateKey);
 
-  return rawSig.toString('base64');
+  return derSig.toString('base64');
 }
 
 async function privySignTransaction(config: WalletConfig, walletId: string, unsignedTxB64: string): Promise<Buffer> {
@@ -358,7 +399,7 @@ export async function verifyAndCreateWallet(code: string): Promise<{ success: bo
   clearPendingOTP();
 
   const user = await privyCreateUser(config, pending.email);
-  const wallet = await privyCreateWallet(config, user.id);
+  const wallet = await privyCreateWallet(config);
 
   const walletInfo: WalletInfo = {
     userId: user.id,
@@ -372,7 +413,7 @@ export async function verifyAndCreateWallet(code: string): Promise<{ success: bo
 
   return {
     success: true,
-    message: `Wallet created! Address: ${wallet.address}`,
+    message: `Wallet created! Address: ${wallet.address}\n\n⚠️ IMPORTANT: Your authorization key has been saved to ~/.byreal-mcp/auth_key.pem\nThis key is your proof of ownership. Back it up! Without it, you cannot sign transactions.`,
     address: wallet.address,
   };
 }
