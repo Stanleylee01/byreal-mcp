@@ -9,7 +9,7 @@ description: |
 
 ## What This Is
 
-Byreal is a Solana CLMM (Concentrated Liquidity Market Maker) DEX. This MCP server exposes all Byreal operations as 34 tools for AI agents.
+Byreal is a Solana CLMM (Concentrated Liquidity Market Maker) DEX. This MCP server exposes all Byreal operations as **38 tools** for AI agents, including 4 wallet tools for fully autonomous operation.
 
 CLMM = you set a price range; liquidity only earns fees while the price is inside your range.
 
@@ -28,7 +28,7 @@ SOL_RPC=https://your-rpc-endpoint.com \
 mcporter config add byreal --stdio "node ~/clawd/byreal-mcp/dist/index.js"
 
 # Verify
-mcporter list byreal    # should list 34 tools
+mcporter list byreal    # should list 38 tools
 ```
 
 ## Quick Test
@@ -90,7 +90,65 @@ mcporter call byreal.byreal_token_price --args '{"tokenSymbolOrMint":"SOL"}'
 - **`byreal_market_overview`** — Quick snapshot: SOL, bbSOL, USDT prices.
 - **`byreal_known_tokens`** — List known mint addresses and decimals.
 
+### Wallet (auto-sign)
+- **`byreal_wallet_setup`** — Send 6-digit OTP to user's email for verification.
+- **`byreal_wallet_verify`** — Verify OTP → creates Privy MPC wallet. Returns wallet address.
+- **`byreal_wallet_status`** — Check wallet address, email, SOL/USDC balance.
+- **`byreal_sign_and_send`** — Sign an unsigned tx via Privy + broadcast to Solana. Returns signature.
+
+## Wallet Setup
+
+For fully autonomous operation (auto-sign), configure the wallet module:
+
+```bash
+# Create config file
+mkdir -p ~/.byreal-mcp
+cat > ~/.byreal-mcp/config.json << 'EOF'
+{
+  "privyAppId": "<your-privy-app-id>",
+  "privyAppSecret": "<your-privy-app-secret>",
+  "resendApiKey": "<your-resend-api-key>",
+  "rpcUrl": "https://your-helius-rpc.com"
+}
+EOF
+```
+
+### Wallet Onboarding Flow
+```
+byreal_wallet_setup email="user@example.com"
+  → sends 6-digit OTP to email (5-min expiry, 3 attempts max)
+byreal_wallet_verify email="user@example.com", code="123456"
+  → creates Privy MPC wallet, saves to ~/.byreal-mcp/wallet.json
+  → returns wallet address (Solana)
+```
+
+### Auto-Sign Mode
+Once wallet is configured, **all write tools automatically sign and broadcast**:
+```
+byreal_open_position poolAddress=..., userAddress=..., ...
+  → builds tx → auto-signs via Privy → broadcasts → returns {signature, explorerUrl}
+```
+
+No manual signing needed. The `userAddress` must match the configured wallet.
+
+### Wallet Security Model
+- **Privy MPC**: Private key is split across Privy's infrastructure. No single party has the full key.
+- **App-level control**: The Privy App admin (holder of App ID + Secret) can sign transactions for wallets created without an owner.
+- **Not self-custodial**: Users cannot export the private key to external wallets (Phantom, etc.).
+- **Suitable for**: MCP/agent-driven operations where the app manages funds on behalf of the user.
+
 ## Common Workflows
+
+### 0. First-Time Setup (Wallet + Fund)
+```
+byreal_wallet_setup email="user@example.com"
+  → check email for OTP
+byreal_wallet_verify email="user@example.com", code="123456"
+  → wallet created!
+byreal_wallet_status
+  → shows address, balance
+[Fund the wallet with SOL + target tokens]
+```
 
 ### 1. Check a Pool Before Investing
 ```
@@ -154,7 +212,9 @@ byreal_submit_liquidity_tx signedTransactions=[...]
 ## Important Concepts
 
 ### Unsigned Transaction Workflow
-All write operations (open/close/add/remove/swap) return **unsigned** base64 transactions. The agent never touches your private key. You sign externally (Phantom, hardware wallet, CLI keytool), then call the submit tool.
+All write operations (open/close/add/remove/swap) build **unsigned** base64 transactions. Two modes:
+1. **Auto-sign (wallet configured)**: The tool automatically signs via Privy MPC and broadcasts. Returns `{signature, explorerUrl}`.
+2. **Manual sign (no wallet)**: Returns unsigned base64 tx. Sign externally (Phantom, hardware wallet), then call `byreal_submit_liquidity_tx`.
 
 ### Amount Units — UI vs Raw
 - `baseAmount` in `byreal_open_position`, `byreal_copy_position`, `byreal_add_liquidity` → **UI units** (e.g. `"50"` = 50 USDC)

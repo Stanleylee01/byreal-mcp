@@ -22,7 +22,7 @@ import { createChain } from './config.js';
 
 const server = new McpServer({
   name: 'byreal-mcp',
-  version: '0.3.0',
+  version: '0.4.0',
 });
 
 const chain = createChain();

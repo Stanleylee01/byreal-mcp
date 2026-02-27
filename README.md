@@ -1,10 +1,10 @@
-# Byreal MCP Server v0.3.0
+# Byreal MCP Server v0.4.0
 
 MCP server for [Byreal DEX](https://www.byreal.io) — Solana CLMM with CEX-grade liquidity.
 
 Exposes all Byreal operations as MCP tools for AI agents via the [Model Context Protocol](https://modelcontextprotocol.io).
 
-**34 tools** covering: pools, swap, positions, liquidity management, copy farming, market data, orders, and tokens.
+**38 tools** covering: pools, swap, positions, liquidity management, copy farming, market data, orders, tokens, and **wallet management with auto-sign**.
 
 ## Quick Start
 
@@ -39,7 +39,7 @@ mcporter call byreal.byreal_swap_quote --args '{"inputMint":"So11111111111111111
 | `SOL_ENDPOINT` | _(same as SOL_RPC)_ | Alias accepted by SDK scripts |
 | `HTTPS_PROXY` | _(unset)_ | HTTP proxy for SDK subprocess calls (needed in China) |
 
-## Tools (34 total)
+## Tools (38 total)
 
 ### Pools
 | Tool | Description |
@@ -107,18 +107,47 @@ mcporter call byreal.byreal_swap_quote --args '{"inputMint":"So11111111111111111
 | `byreal_market_overview` | Quick price snapshot: SOL, bbSOL, USDT |
 | `byreal_known_tokens` | List all known tokens with mint addresses and decimals |
 
-## Write Operations (Unsigned Transaction Workflow)
+### Wallet (auto-sign)
+| Tool | Description |
+|------|-------------|
+| `byreal_wallet_setup` | Send 6-digit email OTP for wallet onboarding |
+| `byreal_wallet_verify` | Verify OTP → create Privy MPC wallet |
+| `byreal_wallet_status` | Check wallet address, email, SOL/USDC balance |
+| `byreal_sign_and_send` | Sign unsigned tx via Privy + broadcast to Solana |
 
-All write operations (open/close/add/remove liquidity, swap, fee collection) return **unsigned base64 transactions**. The workflow is:
+## Write Operations
 
+All write operations build **unsigned base64 transactions**. Two modes:
+
+### Auto-Sign Mode (recommended)
+When wallet is configured (`~/.byreal-mcp/wallet.json`), write tools automatically sign and broadcast:
 ```
-1. Call tool (e.g. byreal_open_position) → get base64 unsigned tx
-2. Sign the tx with your wallet (Phantom, hardware wallet, etc.)
-3. Submit signed tx:
-   - Liquidity ops → byreal_submit_liquidity_tx
-   - Fee collection → sign + byreal_submit_liquidity_tx
-   - Reward claims → byreal_submit_claim (needs orderCode)
-   - Swaps → broadcast directly to Solana RPC
+byreal_open_position → builds tx → Privy signs → Solana broadcast → {signature, explorerUrl}
+```
+
+### Manual Mode
+Without wallet config, tools return unsigned base64 tx for external signing:
+```
+1. Call tool → get base64 unsigned tx
+2. Sign with your wallet (Phantom, hardware wallet, etc.)
+3. Submit signed tx via byreal_submit_liquidity_tx
+```
+
+### Wallet Setup
+```bash
+# Config (Privy + Resend credentials)
+mkdir -p ~/.byreal-mcp
+cat > ~/.byreal-mcp/config.json << EOF
+{
+  "privyAppId": "...",
+  "privyAppSecret": "...",
+  "resendApiKey": "...",
+  "rpcUrl": "https://your-rpc.com"
+}
+EOF
+
+# Then use MCP tools:
+# byreal_wallet_setup → byreal_wallet_verify → wallet.json created automatically
 ```
 
 Tools that build transactions via SDK subprocess (open/close/add/remove/copy) require `SOL_RPC` to be set for on-chain data fetching.
