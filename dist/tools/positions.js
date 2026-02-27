@@ -6,7 +6,7 @@
  * poolMap provides pool details (pair, TVL, fee info)
  */
 import { z } from 'zod';
-import { API_ENDPOINTS, apiFetch } from '../config.js';
+import { API_ENDPOINTS, apiFetch, apiPost } from '../config.js';
 export function registerPositionTools(server, chain) {
     server.tool('byreal_list_positions', 'List all CLMM liquidity positions for a wallet on Byreal. Shows pool pair, PnL, earned fees, deposit, age, and status.', {
         walletAddress: z.string().describe('Solana wallet public key (base58)'),
@@ -63,8 +63,9 @@ export function registerPositionTools(server, chain) {
         depositUsd: z.number().positive().describe('Deposit amount in USD'),
     }, async ({ poolAddress, depositUsd }) => {
         // Fetch pool info via v2 API
-        const data = await apiFetch(API_ENDPOINTS.POOLS_BY_IDS, {
-            ids: poolAddress,
+        // POOLS_BY_IDS is a POST endpoint
+        const data = await apiPost(API_ENDPOINTS.POOLS_BY_IDS, {
+            ids: [poolAddress],
         });
         if (!data?.records?.length) {
             return { content: [{ type: 'text', text: `Pool ${poolAddress} not found` }], isError: true };

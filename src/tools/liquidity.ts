@@ -142,7 +142,7 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
             '--- Unsigned Transactions (base64) ---',
             ...txPayloads.map((tx: string, i: number) => `Tx #${i + 1}: ${tx}`),
             '',
-            '⚠️ Sign these transactions with your wallet, then submit via byreal_submit_signed_tx',
+            '⚠️ Sign these transactions with your wallet, then submit via byreal_submit_liquidity_tx',
           ].join('\n'),
         }],
       };
@@ -303,8 +303,7 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
             `Pool TVL: $${tvl.toLocaleString(undefined, {maximumFractionDigits: 0})}`,
             `Pool 24h Vol: $${vol24h.toLocaleString(undefined, {maximumFractionDigits: 0})}`,
             ``,
-            `⚠️ To execute: use the Byreal SDK or website to build and sign the transaction.`,
-            `The MCP will support direct transaction building in a future update.`,
+            `⚠️ To build and execute: use byreal_open_position with this pool and price range.`,
           ].join('\n'),
         }],
       };
@@ -370,8 +369,8 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
       priceLower: z.string().describe('Lower price bound (token B per token A)'),
       priceUpper: z.string().describe('Upper price bound (token B per token A)'),
       baseToken: z.enum(['A', 'B']).describe('Which token to use as base (A or B)'),
-      baseAmount: z.string().describe('Amount of base token (raw units, e.g. "1000000" for 1 USDC)'),
-      userAddress: z.string().describe('User wallet public key'),
+      baseAmount: z.string().describe('Amount of base token in UI units (e.g. "50" for 50 USDC, "1.5" for 1.5 SOL)'),
+      userAddress: z.string().describe('User wallet public key (base58)'),
       slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
     },
     async ({ poolAddress, priceLower, priceUpper, baseToken, baseAmount, userAddress, slippage }) => {
@@ -488,8 +487,8 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
     {
       nftMint: z.string().describe('Position NFT mint address'),
       baseToken: z.enum(['A', 'B']).describe('Which token to use as base (A or B)'),
-      baseAmount: z.string().describe('Amount of base token (raw units, e.g. "1000000" for 1 USDC)'),
-      userAddress: z.string().describe('User wallet public key'),
+      baseAmount: z.string().describe('Amount of base token in UI units (e.g. "50" for 50 USDC, "1.5" for 1.5 SOL)'),
+      userAddress: z.string().describe('User wallet public key (base58)'),
       slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
     },
     async ({ nftMint, baseToken, baseAmount, userAddress, slippage }) => {

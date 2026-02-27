@@ -89,8 +89,9 @@ export function registerPositionTools(server: McpServer, chain: ChainClient) {
     },
     async ({ poolAddress, depositUsd }) => {
       // Fetch pool info via v2 API
-      const data = await apiFetch<{ records: any[] }>(API_ENDPOINTS.POOLS_BY_IDS, {
-        ids: poolAddress,
+      // POOLS_BY_IDS is a POST endpoint
+      const data = await apiPost<{ records: any[] }>(API_ENDPOINTS.POOLS_BY_IDS, {
+        ids: [poolAddress],
       });
 
       if (!data?.records?.length) {

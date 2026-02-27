@@ -43,11 +43,12 @@ export function registerPoolTools(server, chain) {
                 }],
         };
     });
-    server.tool('byreal_pool_info', 'Get detailed info for specific Byreal pool(s) by address.', {
-        poolIds: z.array(z.string()).min(1).max(10).describe('Pool addresses'),
+    server.tool('byreal_pool_info', 'Get detailed info for specific Byreal pool(s) by address (up to 10 at once).', {
+        poolIds: z.array(z.string()).min(1).max(10).describe('Pool addresses (base58)'),
     }, async ({ poolIds }) => {
-        const data = await apiFetch(API_ENDPOINTS.POOLS_BY_IDS, {
-            ids: poolIds.join(','),
+        // POOLS_BY_IDS is a POST endpoint — GET returns empty
+        const data = await apiPost(API_ENDPOINTS.POOLS_BY_IDS, {
+            ids: poolIds,
         });
         if (!data?.records?.length) {
             return { content: [{ type: 'text', text: 'Pools not found.' }], isError: true };

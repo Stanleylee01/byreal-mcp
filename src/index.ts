@@ -21,7 +21,7 @@ import { createChain } from './config.js';
 
 const server = new McpServer({
   name: 'byreal-mcp',
-  version: '0.2.0',
+  version: '0.3.0',
 });
 
 const chain = createChain();
@@ -39,7 +39,7 @@ registerLiquidityTools(server, chain);
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[byreal-mcp] Server v0.2.0 started on stdio');
+  console.error('[byreal-mcp] Server v0.3.0 started on stdio');
 }
 
 main().catch((err) => {
