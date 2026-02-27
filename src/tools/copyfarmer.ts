@@ -1,12 +1,33 @@
 /**
- * CopyFarmer tools — top farmers, top positions leaderboard
+ * CopyFarmer tools — top farmers, top positions leaderboard, copy position
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ChainClient, apiPost, apiFetch } from '../config.js';
+import { execSync } from 'child_process';
+import * as path from 'path';
 
 const API_BASE = process.env.BYREAL_API_BASE || 'https://api2.byreal.io/byreal/api';
+const SDK_DIR = path.resolve(import.meta.dirname ?? __dirname, '../../sdk-ref');
+
+/**
+ * Run an SDK script and return its output
+ */
+function runSdkScript(script: string, env: Record<string, string> = {}): string {
+  const fullEnv = {
+    ...process.env,
+    ...env,
+    SOL_ENDPOINT: process.env.SOL_RPC || process.env.SOL_ENDPOINT || 'https://api.mainnet-beta.solana.com',
+  };
+
+  return execSync(`npx tsx ${script}`, {
+    cwd: SDK_DIR,
+    env: fullEnv,
+    timeout: 30000,
+    encoding: 'utf-8',
+  });
+}
 
 interface TopFarmersResp {
   records: any[];
@@ -132,6 +153,126 @@ export function registerCopyfarmerTools(server: McpServer, chain: ChainClient) {
       return {
         content: [{ type: 'text' as const, text: `CopyFarmer Overview:\n${lines.join('\n')}` }],
       };
+    }
+  );
+
+  server.tool(
+    'byreal_copy_position',
+    'Copy a top farmer\'s position — creates a new position with the same pool, tick range, and proportional amounts. Returns unsigned tx to sign.',
+    {
+      positionAddress: z.string().describe('Position address to copy (from top positions)'),
+      userAddress: z.string().describe('Your wallet public key'),
+      depositAmount: z.string().describe('Amount to deposit in base token (raw units, e.g. "1000000" for 1 USDC)'),
+      baseToken: z.enum(['A', 'B']).default('A').describe('Which token your depositAmount is in (A or B)'),
+      slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
+    },
+    async ({ positionAddress, userAddress, depositAmount, baseToken, slippage }) => {
+      try {
+        // Step 1: Get the position details to copy
+        const posData = await apiFetch<any>(
+          `${API_BASE}/dex/v2/position/detail`,
+          { address: positionAddress },
+        );
+
+        if (!posData) {
+          return { content: [{ type: 'text' as const, text: `Position ${positionAddress} not found.` }], isError: true };
+        }
+
+        if (posData.status !== 0) {
+          return { content: [{ type: 'text' as const, text: `Cannot copy closed position. Status: ${posData.status}` }], isError: true };
+        }
+
+        const poolAddress = posData.poolAddress ?? posData.pool?.poolAddress;
+        const tickLower = posData.lowerTick;
+        const tickUpper = posData.upperTick;
+
+        if (!poolAddress || tickLower === undefined || tickUpper === undefined) {
+          return { content: [{ type: 'text' as const, text: `Missing position data: poolAddress=${poolAddress}, ticks=${tickLower}-${tickUpper}` }], isError: true };
+        }
+
+        // Step 2: Get pool details to convert ticks to prices
+        const poolData = await apiFetch<any>(
+          `${API_BASE}/dex/v2/pools/details`,
+          { poolAddress },
+        );
+
+        if (!poolData) {
+          return { content: [{ type: 'text' as const, text: `Pool ${poolAddress} not found.` }], isError: true };
+        }
+
+        // Get tick spacing and decimals from pool
+        const mintA = poolData.mintA?.mintInfo ?? poolData.mintA;
+        const mintB = poolData.mintB?.mintInfo ?? poolData.mintB;
+        const symA = mintA?.symbol ?? '?';
+        const symB = mintB?.symbol ?? '?';
+
+        // Get prices from the original position
+        const priceLower = posData.lowerPrice ?? posData.priceLower;
+        const priceUpper = posData.upperPrice ?? posData.priceUpper;
+
+        if (!priceLower || !priceUpper) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: `Cannot determine price range from position. Try using byreal_open_position directly with tick values: ${tickLower} - ${tickUpper}`,
+            }],
+            isError: true,
+          };
+        }
+
+        // Step 3: Build the create position transaction
+        const output = runSdkScript('src/scripts/create-position.ts', {
+          POOL_ADDRESS: poolAddress,
+          PRICE_LOWER: String(priceLower),
+          PRICE_UPPER: String(priceUpper),
+          BASE_TOKEN: baseToken,
+          BASE_AMOUNT: depositAmount,
+          USER_ADDRESS: userAddress,
+          SLIPPAGE: slippage || '0.02',
+        });
+
+        const result = JSON.parse(output.trim());
+
+        if (result.error) {
+          return { content: [{ type: 'text' as const, text: `Error: ${result.error}` }], isError: true };
+        }
+
+        const originalWallet = posData.providerAddress ?? posData.walletAddress ?? '?';
+        const originalPnl = posData.pnlUsd ?? 0;
+        const originalDeposit = posData.totalDeposit ?? 0;
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              `Copy Position Transaction Built`,
+              ``,
+              `Copying from: ${positionAddress}`,
+              `Original farmer: ${originalWallet}`,
+              `Original PnL: $${Number(originalPnl).toFixed(2)} on $${Number(originalDeposit).toFixed(2)} deposit`,
+              ``,
+              `Your new position:`,
+              `  Pool: ${poolAddress} (${symA}/${symB})`,
+              `  Price range: ${result.priceLower} — ${result.priceUpper}`,
+              `  Tick range: ${result.tickLower} — ${result.tickUpper}`,
+              ``,
+              `Estimated amounts:`,
+              `  Token A (${symA}): ${result.estimatedAmountA}`,
+              `  Token B (${symB}): ${result.estimatedAmountB}`,
+              ``,
+              `NFT Mint (your position address): ${result.nftAddress}`,
+              ``,
+              `--- Unsigned Transaction (base64) ---`,
+              result.unsignedTx,
+              ``,
+              `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
+            ].join('\n'),
+          }],
+        };
+      } catch (err: any) {
+        const msg = err.stderr || err.message || String(err);
+        return { content: [{ type: 'text' as const, text: `Error: ${msg}` }], isError: true };
+      }
     }
   );
 }

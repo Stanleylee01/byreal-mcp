@@ -19,7 +19,7 @@ const API_BASE = process.env.BYREAL_API_BASE || 'https://api2.byreal.io/byreal/a
 const SDK_DIR = path.resolve(import.meta.dirname ?? __dirname, '../../sdk-ref');
 
 /**
- * Run an SDK script and return its output
+ * Run an SDK script and return its parsed JSON output
  */
 function runSdkScript(script: string, env: Record<string, string> = {}): string {
   const fullEnv = {
@@ -28,10 +28,10 @@ function runSdkScript(script: string, env: Record<string, string> = {}): string 
     SOL_ENDPOINT: process.env.SOL_RPC || process.env.SOL_ENDPOINT || 'https://api.mainnet-beta.solana.com',
   };
 
-  return execSync(`npx tsx ${script}`, {
+  return execSync(`npx tsx --import ./src/scripts/proxy-setup.ts ${script}`, {
     cwd: SDK_DIR,
     env: fullEnv,
-    timeout: 30000,
+    timeout: 60000,
     encoding: 'utf-8',
   });
 }
@@ -355,6 +355,335 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
             data.openTime ? `Opened: ${new Date(data.openTime * 1000).toISOString().slice(0, 10)}` : '',
             data.closeTime ? `Closed: ${new Date(data.closeTime * 1000).toISOString().slice(0, 10)}` : '',
           ].filter(Boolean).join('\n'),
+        }],
+      };
+    }
+  );
+
+  // ==================== Position Operations (SDK-based, transaction building) ====================
+
+  server.tool(
+    'byreal_open_position',
+    'Build an unsigned transaction to open a new CLMM LP position. Returns base64 tx to sign.',
+    {
+      poolAddress: z.string().describe('Pool address'),
+      priceLower: z.string().describe('Lower price bound (token B per token A)'),
+      priceUpper: z.string().describe('Upper price bound (token B per token A)'),
+      baseToken: z.enum(['A', 'B']).describe('Which token to use as base (A or B)'),
+      baseAmount: z.string().describe('Amount of base token (raw units, e.g. "1000000" for 1 USDC)'),
+      userAddress: z.string().describe('User wallet public key'),
+      slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
+    },
+    async ({ poolAddress, priceLower, priceUpper, baseToken, baseAmount, userAddress, slippage }) => {
+      try {
+        const output = runSdkScript('src/scripts/create-position.ts', {
+          POOL_ADDRESS: poolAddress,
+          PRICE_LOWER: priceLower,
+          PRICE_UPPER: priceUpper,
+          BASE_TOKEN: baseToken,
+          BASE_AMOUNT: baseAmount,
+          USER_ADDRESS: userAddress,
+          SLIPPAGE: slippage || '0.02',
+        });
+
+        const result = JSON.parse(output.trim());
+
+        if (result.error) {
+          return { content: [{ type: 'text' as const, text: `Error: ${result.error}` }], isError: true };
+        }
+
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              `Open Position Transaction Built`,
+              ``,
+              `Pool: ${result.poolAddress}`,
+              `Token A: ${result.mintA}`,
+              `Token B: ${result.mintB}`,
+              `Price range: ${result.priceLower} — ${result.priceUpper}`,
+              `Tick range: ${result.tickLower} — ${result.tickUpper}`,
+              ``,
+              `Estimated amounts:`,
+              `  Token A: ${result.estimatedAmountA}`,
+              `  Token B: ${result.estimatedAmountB}`,
+              ``,
+              `NFT Mint (position address): ${result.nftAddress}`,
+              ``,
+              `--- Unsigned Transaction (base64) ---`,
+              result.unsignedTx,
+              ``,
+              `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
+            ].join('\n'),
+          }],
+        };
+      } catch (err: any) {
+        const msg = err.stderr || err.message || String(err);
+        return { content: [{ type: 'text' as const, text: `SDK Error: ${msg}` }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'byreal_close_position',
+    'Build an unsigned transaction to close a CLMM position (remove all liquidity and close). Returns base64 tx to sign.',
+    {
+      nftMint: z.string().describe('Position NFT mint address'),
+      userAddress: z.string().describe('User wallet public key'),
+      slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
+      closePosition: z.boolean().optional().describe('Whether to close the position account (default true)'),
+    },
+    async ({ nftMint, userAddress, slippage, closePosition }) => {
+      try {
+        const output = runSdkScript('src/scripts/close-position.ts', {
+          NFT_MINT: nftMint,
+          USER_ADDRESS: userAddress,
+          SLIPPAGE: slippage || '0.02',
+          CLOSE_POSITION: closePosition === false ? 'false' : 'true',
+        });
+
+        const result = JSON.parse(output.trim());
+
+        if (result.error) {
+          return { content: [{ type: 'text' as const, text: `Error: ${result.error}` }], isError: true };
+        }
+
+        const pos = result.positionInfo;
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              `Close Position Transaction Built`,
+              ``,
+              `Position NFT: ${pos.nftMint}`,
+              `Pool: ${pos.poolAddress}`,
+              `Token A: ${pos.mintA}`,
+              `Token B: ${pos.mintB}`,
+              ``,
+              `Position details:`,
+              `  Price range: ${pos.priceLower} — ${pos.priceUpper}`,
+              `  Current amount A: ${pos.amountA}`,
+              `  Current amount B: ${pos.amountB}`,
+              `  Unclaimed fee A: ${pos.feeAmountA}`,
+              `  Unclaimed fee B: ${pos.feeAmountB}`,
+              `  Close position: ${pos.closePosition}`,
+              ``,
+              `--- Unsigned Transaction (base64) ---`,
+              result.unsignedTx,
+              ``,
+              `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
+            ].join('\n'),
+          }],
+        };
+      } catch (err: any) {
+        const msg = err.stderr || err.message || String(err);
+        return { content: [{ type: 'text' as const, text: `SDK Error: ${msg}` }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'byreal_add_liquidity',
+    'Build an unsigned transaction to add liquidity to an existing CLMM position. Returns base64 tx to sign.',
+    {
+      nftMint: z.string().describe('Position NFT mint address'),
+      baseToken: z.enum(['A', 'B']).describe('Which token to use as base (A or B)'),
+      baseAmount: z.string().describe('Amount of base token (raw units, e.g. "1000000" for 1 USDC)'),
+      userAddress: z.string().describe('User wallet public key'),
+      slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
+    },
+    async ({ nftMint, baseToken, baseAmount, userAddress, slippage }) => {
+      try {
+        const output = runSdkScript('src/scripts/add-liquidity.ts', {
+          NFT_MINT: nftMint,
+          BASE_TOKEN: baseToken,
+          BASE_AMOUNT: baseAmount,
+          USER_ADDRESS: userAddress,
+          SLIPPAGE: slippage || '0.02',
+        });
+
+        const result = JSON.parse(output.trim());
+
+        if (result.error) {
+          return { content: [{ type: 'text' as const, text: `Error: ${result.error}` }], isError: true };
+        }
+
+        const pos = result.positionInfo;
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              `Add Liquidity Transaction Built`,
+              ``,
+              `Position NFT: ${pos.nftMint}`,
+              `Pool: ${pos.poolAddress}`,
+              `Price range: ${pos.priceLower} — ${pos.priceUpper}`,
+              ``,
+              `Current position:`,
+              `  Token A: ${pos.currentAmountA}`,
+              `  Token B: ${pos.currentAmountB}`,
+              ``,
+              `Adding:`,
+              `  Token A: ${result.estimatedAmountA}`,
+              `  Token B: ${result.estimatedAmountB}`,
+              ``,
+              `--- Unsigned Transaction (base64) ---`,
+              result.unsignedTx,
+              ``,
+              `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
+            ].join('\n'),
+          }],
+        };
+      } catch (err: any) {
+        const msg = err.stderr || err.message || String(err);
+        return { content: [{ type: 'text' as const, text: `SDK Error: ${msg}` }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
+    'byreal_remove_liquidity',
+    'Build an unsigned transaction to remove partial liquidity from a CLMM position. Returns base64 tx to sign.',
+    {
+      nftMint: z.string().describe('Position NFT mint address'),
+      liquidityPercent: z.number().min(1).max(100).describe('Percentage of liquidity to remove (1-100)'),
+      userAddress: z.string().describe('User wallet public key'),
+      slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
+    },
+    async ({ nftMint, liquidityPercent, userAddress, slippage }) => {
+      try {
+        const output = runSdkScript('src/scripts/decrease-liquidity.ts', {
+          NFT_MINT: nftMint,
+          LIQUIDITY_PERCENT: String(liquidityPercent),
+          USER_ADDRESS: userAddress,
+          SLIPPAGE: slippage || '0.02',
+        });
+
+        const result = JSON.parse(output.trim());
+
+        if (result.error) {
+          return { content: [{ type: 'text' as const, text: `Error: ${result.error}` }], isError: true };
+        }
+
+        const pos = result.positionInfo;
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              `Remove Liquidity Transaction Built`,
+              ``,
+              `Position NFT: ${pos.nftMint}`,
+              `Pool: ${pos.poolAddress}`,
+              `Price range: ${pos.priceLower} — ${pos.priceUpper}`,
+              ``,
+              `Current position:`,
+              `  Token A: ${pos.currentAmountA}`,
+              `  Token B: ${pos.currentAmountB}`,
+              ``,
+              `Removing ${result.liquidityPercent}% of liquidity:`,
+              `  Expected Token A: ~${result.expectedAmountA}`,
+              `  Expected Token B: ~${result.expectedAmountB}`,
+              `  Liquidity: ${result.liquidityToRemove} / ${result.totalLiquidity}`,
+              ``,
+              `--- Unsigned Transaction (base64) ---`,
+              result.unsignedTx,
+              ``,
+              `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
+            ].join('\n'),
+          }],
+        };
+      } catch (err: any) {
+        const msg = err.stderr || err.message || String(err);
+        return { content: [{ type: 'text' as const, text: `SDK Error: ${msg}` }], isError: true };
+      }
+    }
+  );
+
+  // ==================== Copy Farm (replicate a top position) ====================
+
+  server.tool(
+    'byreal_copy_position',
+    'Copy a top farmer\'s position: look up an existing position by address and build an unsigned tx to replicate it for your wallet. Returns base64 tx to sign.',
+    {
+      positionAddress: z.string().describe('Address of the position to copy'),
+      userAddress:     z.string().describe('Your wallet public key (payer)'),
+      baseToken:       z.enum(['A', 'B']).default('A').optional().describe('Which token to use as the input (default A)'),
+      baseAmount:      z.string().describe('Amount of base token in UI units (e.g. "50" for $50 of Token A)'),
+      slippage:        z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
+    },
+    async ({ positionAddress, userAddress, baseToken = 'A', baseAmount, slippage }) => {
+      // Step 1: Look up position details from Byreal API
+      let posDetail: any;
+      try {
+        posDetail = await apiFetch<any>(
+          `${API_BASE}/dex/v2/position/detail`,
+          { address: positionAddress },
+        );
+      } catch (e: any) {
+        return { content: [{ type: 'text' as const, text: `Failed to fetch position: ${e.message}` }], isError: true };
+      }
+
+      if (!posDetail?.pool) {
+        return { content: [{ type: 'text' as const, text: 'Position not found or has no pool data.' }], isError: true };
+      }
+
+      const pool   = posDetail.pool ?? {};
+      const symA   = pool.mintA?.mintInfo?.symbol ?? pool.mintA?.symbol ?? 'TokenA';
+      const symB   = pool.mintB?.mintInfo?.symbol ?? pool.mintB?.symbol ?? 'TokenB';
+      const poolAddress = pool.poolAddress ?? posDetail.poolAddress ?? pool.address;
+
+      // Get tick range from the position
+      const tickLower = posDetail.lowerTick;
+      const tickUpper = posDetail.upperTick;
+
+      if (tickLower === undefined || tickUpper === undefined || !poolAddress) {
+        return {
+          content: [{ type: 'text' as const, text: `Position ${positionAddress} missing tick/pool data. Lower: ${tickLower}, Upper: ${tickUpper}, Pool: ${poolAddress}` }],
+          isError: true,
+        };
+      }
+
+      // Step 2: Build open position tx with same pool+range (using TICK mode)
+      let result: any;
+      try {
+        const output = runSdkScript('src/scripts/create-position.ts', {
+          POOL_ADDRESS:  poolAddress,
+          TICK_LOWER:    String(tickLower),
+          TICK_UPPER:    String(tickUpper),
+          BASE_TOKEN:    baseToken,
+          BASE_AMOUNT:   baseAmount,
+          USER_ADDRESS:  userAddress,
+          SLIPPAGE:      slippage || '0.02',
+        });
+        result = JSON.parse(output.trim());
+      } catch (err: any) {
+        const msg = err.stderr || err.message || String(err);
+        return { content: [{ type: 'text' as const, text: `SDK Error building tx: ${msg}` }], isError: true };
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: [
+            `📋 Copy Position — ${symA}/${symB}`,
+            ``,
+            `Copying: ${positionAddress}`,
+            `Original farmer: ${posDetail.providerAddress ?? '?'}`,
+            `Original PnL: $${Number(posDetail.pnlUsd ?? 0).toFixed(2)} (${(Number(posDetail.pnlUsdPercent ?? 0) * 100).toFixed(2)}%)`,
+            ``,
+            `Your new position:`,
+            `Pool: ${poolAddress}`,
+            `Price range: ${result.priceLower} — ${result.priceUpper}`,
+            `Ticks: ${result.tickLower} — ${result.tickUpper}`,
+            `Est. ${symA}: ${result.estimatedAmountA}`,
+            `Est. ${symB}: ${result.estimatedAmountB}`,
+            `NFT address: ${result.nftAddress}`,
+            ``,
+            `--- Unsigned Transaction (base64) ---`,
+            result.unsignedTx,
+            ``,
+            `Sign this transaction with your wallet, then submit via byreal_submit_liquidity_tx`,
+          ].join('\n'),
         }],
       };
     }
