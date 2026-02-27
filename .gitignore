@@ -1,2 +1,7 @@
 node_modules/
-sdk-ref/node_modules/
+dist/
+sdk-ref/
+api-docs/
+*.js.map
+.env
+.env.*
