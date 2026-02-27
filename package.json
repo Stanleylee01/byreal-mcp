@@ -1,0 +1,31 @@
+{
+  "name": "@byreal/mcp-server",
+  "version": "0.1.0",
+  "description": "Byreal DEX MCP Server — expose Byreal CLMM operations to AI agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "byreal-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@byreal/clmm-sdk": "file:sdk-ref",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.0",
+    "bn.js": "^5.2.1",
+    "bs58": "^6.0.0",
+    "decimal.js": "^10.5.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.6",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
