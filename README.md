@@ -1,10 +1,10 @@
-# Byreal MCP Server v0.4.0
+# Byreal MCP Server v0.5.0
 
 MCP server for [Byreal DEX](https://www.byreal.io) — Solana CLMM with CEX-grade liquidity.
 
 Exposes all Byreal operations as MCP tools for AI agents via the [Model Context Protocol](https://modelcontextprotocol.io).
 
-**38 tools** covering: pools, swap, positions, liquidity management, copy farming, market data, orders, tokens, and **wallet management with auto-sign**.
+**36 tools** covering: pools, swap, positions, liquidity management, copy farming, market data, orders, tokens, and **wallet management with auto-sign**.
 
 ## Quick Start
 
@@ -15,13 +15,13 @@ Exposes all Byreal operations as MCP tools for AI agents via the [Model Context 
 git clone https://github.com/Stanleylee01/byreal-mcp.git
 cd byreal-mcp && npm install && npm run build
 
-# 2. 配置 RPC（可选，默认用 mainnet-beta）
+# 2. 配置 RPC（获取免费 Helius API key: https://helius.dev）
 bash scripts/setup.sh
 
 # 3. Register as MCP server in Claude Code
 claude mcp add byreal -- node $(pwd)/dist/index.js
 
-# 4. 重启 Claude Code → 38 个工具可用
+# 4. 重启 Claude Code → 36 个工具可用
 # 对话框里说 "帮我创建钱包" 即可开始
 ```
 
@@ -57,7 +57,7 @@ mcporter call byreal.byreal_global_overview
 | `SOL_ENDPOINT` | _(same as SOL_RPC)_ | Alias accepted by SDK scripts |
 | `HTTPS_PROXY` | _(unset)_ | HTTP proxy for SDK subprocess calls (needed in China) |
 
-## Tools (38 total)
+## Tools (36 total)
 
 ### Pools
 | Tool | Description |
@@ -128,10 +128,9 @@ mcporter call byreal.byreal_global_overview
 ### Wallet (auto-sign)
 | Tool | Description |
 |------|-------------|
-| `byreal_wallet_setup` | Send 6-digit email OTP for wallet onboarding |
-| `byreal_wallet_verify` | Verify OTP → create Privy MPC wallet |
-| `byreal_wallet_status` | Check wallet address, email, SOL/USDC balance |
-| `byreal_sign_and_send` | Sign unsigned tx via Privy + broadcast to Solana |
+| `byreal_wallet_setup` | Generate a local Solana keypair, saved to `~/.byreal-mcp/wallet.json` |
+| `byreal_wallet_status` | Check wallet address, SOL/USDC balance |
+| `byreal_sign_and_send` | Sign unsigned tx with local keypair + broadcast to Solana |
 
 ## Write Operations
 
@@ -140,7 +139,7 @@ All write operations build **unsigned base64 transactions**. Two modes:
 ### Auto-Sign Mode (recommended)
 When wallet is configured (`~/.byreal-mcp/wallet.json`), write tools automatically sign and broadcast:
 ```
-byreal_open_position → builds tx → Privy signs → Solana broadcast → {signature, explorerUrl}
+byreal_open_position → builds tx → local keypair signs → Solana broadcast → {signature, explorerUrl}
 ```
 
 ### Manual Mode
@@ -151,21 +150,13 @@ Without wallet config, tools return unsigned base64 tx for external signing:
 3. Submit signed tx via byreal_submit_liquidity_tx
 ```
 
-### Wallet Setup
+### Wallet Config
 ```bash
-# Config (Privy + Resend credentials)
-mkdir -p ~/.byreal-mcp
-cat > ~/.byreal-mcp/config.json << EOF
-{
-  "privyAppId": "...",
-  "privyAppSecret": "...",
-  "resendApiKey": "...",
-  "rpcUrl": "https://your-rpc.com"
-}
-EOF
+# Run setup script (writes RPC config to ~/.byreal-mcp/config.json)
+bash scripts/setup.sh
 
-# Then use MCP tools:
-# byreal_wallet_setup → byreal_wallet_verify → wallet.json created automatically
+# Then create wallet via MCP:
+# byreal_wallet_setup → wallet.json created automatically
 ```
 
 Tools that build transactions via SDK subprocess (open/close/add/remove/copy) require `SOL_RPC` to be set for on-chain data fetching.
@@ -180,13 +171,13 @@ Copy Farm lets you replicate a top farmer's position tick range with your own ca
 3. byreal_position_detail    → get position details
 4. byreal_copy_position      → build tx with same tick range
                                  (inserts REFERER_POSITION memo)
-5. Sign tx
-6. byreal_submit_liquidity_tx → broadcast
+5. Sign tx (auto or manual)
+6. byreal_submit_liquidity_tx → broadcast (manual mode only)
 ```
 
-The `REFERER_POSITION` memo links your position to the original farmer — this is verified on-chain by the Byreal CopyFarmer program (CLMM program: `REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2`).
+The `REFERER_POSITION` memo links your position to the original farmer — this is verified on-chain by the Byreal CopyFarmer program.
 
-**Note**: Use `baseAmount` in UI units (e.g. `"50"` = $50 of Token A), not raw lamports.
+**Note**: Use `baseAmount` in UI units (e.g. `"50"` = 50 of Token A), not raw lamports.
 
 ## Architecture
 
@@ -195,6 +186,7 @@ byreal-mcp/
 ├── src/
 │   ├── index.ts              — MCP server entry, transport, tool registration
 │   ├── config.ts             — Chain client, API endpoints, fetch helpers
+│   ├── wallet.ts             — Local keypair generation, signing, balance queries
 │   └── tools/
 │       ├── pools.ts          — Pool queries (list, info, details, live price)
 │       ├── swap.ts           — Swap quote + unsigned transaction
@@ -203,7 +195,8 @@ byreal-mcp/
 │       ├── copyfarmer.ts     — Top farmers, top positions, overview leaderboards
 │       ├── market.ts         — Global overview, prices, klines, hot tokens
 │       ├── orders.ts         — Order history, position detail, overview
-│       └── tokens.ts         — Token prices, market overview, known tokens
+│       ├── tokens.ts         — Token prices, market overview, known tokens
+│       └── wallet.ts         — Wallet MCP tool definitions
 ├── sdk-ref/                  — @byreal/clmm-sdk (DO NOT MODIFY)
 │   └── src/scripts/          — SDK scripts for building transactions
 │       ├── create-position.ts
@@ -211,6 +204,8 @@ byreal-mcp/
 │       ├── add-liquidity.ts
 │       ├── decrease-liquidity.ts
 │       └── proxy-setup.ts
+├── scripts/
+│   └── setup.sh              — One-line config setup (writes ~/.byreal-mcp/config.json)
 ├── dist/                     — Compiled JS (npm run build)
 └── package.json
 ```
@@ -226,23 +221,22 @@ byreal-mcp/
 
 ## Known Limitations
 
-- **Proxy required in China**: SDK subprocesses use `HTTPS_PROXY` for on-chain RPC calls. Without it, `byreal_open_position` / `byreal_copy_position` will time out.
-- **WebSocket confirmations unreliable**: SDK scripts use RPC polling, not ws subscriptions. Confirmation may report "finalized" before the tx actually lands.
+- **Proxy required in China**: SDK subprocesses use `HTTPS_PROXY` for on-chain RPC calls. Without it, write operations will time out.
 - **Tick alignment**: CLMM positions snap to the pool's `tickSpacing`. The SDK handles this automatically — don't pre-align prices.
 - **`byreal_pool_info` uses POST**: The `/pools/info/ids` endpoint is a POST endpoint; sending a GET returns empty results.
 
 ## Roadmap
 
-### v0.4 ✅ Current
-- 38 tools operational
+### v0.5 ✅ Current
+- 36 tools operational
+- Local keypair wallet (generate, sign, broadcast)
+- Auto-sign for all write operations
 - CLMM open/close/add/remove via SDK subprocesses
 - Copy Farm with REFERER_POSITION memo (verified on mainnet)
 - Fee collection and reward claim workflows
 - CopyFarmer leaderboards and overview
-- Wallet onboarding (email OTP + Privy MPC + P-256 auth key)
-- Auto-sign for all write operations
 
-### v0.5
+### v0.6 (planned)
 - Reset Launchpad integration
 - Position auto-rebalance (tick drift detection)
 - Portfolio summary (all positions + PnL aggregated)
