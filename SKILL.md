@@ -9,7 +9,7 @@ description: |
 
 ## What This Is
 
-Byreal is a Solana CLMM (Concentrated Liquidity Market Maker) DEX. This MCP server exposes all Byreal operations as **38 tools** for AI agents, including 4 wallet tools for fully autonomous operation.
+Byreal is a Solana CLMM (Concentrated Liquidity Market Maker) DEX. This MCP server exposes all Byreal operations as **36 tools** for AI agents, including 3 wallet tools for fully autonomous operation.
 
 CLMM = you set a price range; liquidity only earns fees while the price is inside your range.
 
@@ -28,7 +28,7 @@ SOL_RPC=https://your-rpc-endpoint.com \
 mcporter config add byreal --stdio "node ~/clawd/byreal-mcp/dist/index.js"
 
 # Verify
-mcporter list byreal    # should list 38 tools
+mcporter list byreal    # should list 36 tools
 ```
 
 ## Quick Test
@@ -91,61 +91,49 @@ mcporter call byreal.byreal_token_price --args '{"tokenSymbolOrMint":"SOL"}'
 - **`byreal_known_tokens`** — List known mint addresses and decimals.
 
 ### Wallet (auto-sign)
-- **`byreal_wallet_setup`** — Send 6-digit OTP to user's email for verification.
-- **`byreal_wallet_verify`** — Verify OTP → creates Privy MPC wallet. Returns wallet address.
-- **`byreal_wallet_status`** — Check wallet address, email, SOL/USDC balance.
-- **`byreal_sign_and_send`** — Sign an unsigned tx via Privy + broadcast to Solana. Returns signature.
+- **`byreal_wallet_setup`** — Generate a local Solana keypair. Saved to `~/.byreal-mcp/wallet.json` (chmod 600).
+- **`byreal_wallet_status`** — Check wallet address, SOL/USDC balance.
+- **`byreal_sign_and_send`** — Sign an unsigned tx with local keypair + broadcast to Solana. Returns signature.
 
 ## Wallet Setup
 
-For fully autonomous operation (auto-sign), configure the wallet module:
-
+### Config
 ```bash
-# Create config file
-mkdir -p ~/.byreal-mcp
-cat > ~/.byreal-mcp/config.json << 'EOF'
-{
-  "privyAppId": "<your-privy-app-id>",
-  "privyAppSecret": "<your-privy-app-secret>",
-  "resendApiKey": "<your-resend-api-key>",
-  "rpcUrl": "https://your-helius-rpc.com"
-}
-EOF
+bash scripts/setup.sh
+# → writes ~/.byreal-mcp/config.json with rpcUrl + heliusApiKey
+# → get your free Helius API key at https://helius.dev
 ```
 
 ### Wallet Onboarding Flow
 ```
-byreal_wallet_setup email="user@example.com"
-  → sends 6-digit OTP to email (5-min expiry, 3 attempts max)
-byreal_wallet_verify email="user@example.com", code="123456"
-  → creates Privy MPC wallet, saves to ~/.byreal-mcp/wallet.json
-  → returns wallet address (Solana)
+byreal_wallet_setup
+  → generates local Solana Ed25519 keypair
+  → saves to ~/.byreal-mcp/wallet.json (chmod 600)
+  → returns wallet address
+[Fund the wallet with SOL + target tokens]
 ```
 
 ### Auto-Sign Mode
 Once wallet is configured, **all write tools automatically sign and broadcast**:
 ```
 byreal_open_position poolAddress=..., userAddress=..., ...
-  → builds tx → auto-signs via Privy → broadcasts → returns {signature, explorerUrl}
+  → builds tx → auto-signs with local keypair → broadcasts → returns {signature, explorerUrl}
 ```
 
 No manual signing needed. The `userAddress` must match the configured wallet.
 
 ### Wallet Security Model
-- **Privy MPC**: Private key is split across Privy's infrastructure. No single party has the full key.
-- **User-owned**: Each wallet has a P-256 authorization key. The private key (`~/.byreal-mcp/auth_key.pem`) is stored locally on the user's machine. Without this key, nobody — not even the app admin — can sign transactions.
-- **Dual authorization**: Signing requires BOTH Privy App credentials (Basic Auth) AND the user's authorization key signature. Compromising either alone is insufficient.
-- **Not self-custodial in the traditional sense**: Users cannot export the Solana private key to Phantom. But the authorization key gives them exclusive control over signing.
-- **Back up auth_key.pem**: If lost, the wallet becomes inaccessible. There is no recovery mechanism.
+- **Local keypair**: Standard Solana Ed25519 keypair stored at `~/.byreal-mcp/wallet.json`
+- **Self-custodial**: You hold the private key. Export to Phantom or any Solana wallet anytime.
+- **Back up wallet.json**: If lost, the wallet and funds are inaccessible. No recovery mechanism.
+- **chmod 600**: File permissions restrict access to your user account only.
 
 ## Common Workflows
 
 ### 0. First-Time Setup (Wallet + Fund)
 ```
-byreal_wallet_setup email="user@example.com"
-  → check email for OTP
-byreal_wallet_verify email="user@example.com", code="123456"
-  → wallet created!
+byreal_wallet_setup
+  → keypair generated, wallet address returned
 byreal_wallet_status
   → shows address, balance
 [Fund the wallet with SOL + target tokens]
@@ -214,7 +202,7 @@ byreal_submit_liquidity_tx signedTransactions=[...]
 
 ### Unsigned Transaction Workflow
 All write operations (open/close/add/remove/swap) build **unsigned** base64 transactions. Two modes:
-1. **Auto-sign (wallet configured)**: The tool automatically signs via Privy MPC and broadcasts. Returns `{signature, explorerUrl}`.
+1. **Auto-sign (wallet configured)**: The tool automatically signs with local keypair and broadcasts. Returns `{signature, explorerUrl}`.
 2. **Manual sign (no wallet)**: Returns unsigned base64 tx. Sign externally (Phantom, hardware wallet), then call `byreal_submit_liquidity_tx`.
 
 ### Amount Units — UI vs Raw
