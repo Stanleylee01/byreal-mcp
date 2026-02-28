@@ -28,7 +28,7 @@ const SDK_DIST_DIR = path.resolve(import.meta.dirname ?? __dirname, '../../sdk-d
  */
 function getWalletAddress(): string | null {
   const wallet = loadWallet();
-  return wallet?.address ?? null;
+  return wallet?.publicKey ?? null;
 }
 
 async function tryAutoSign(unsignedTx: string): Promise<string | null> {

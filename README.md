@@ -15,14 +15,14 @@ Exposes all Byreal operations as MCP tools for AI agents via the [Model Context 
 git clone https://github.com/Stanleylee01/byreal-mcp.git
 cd byreal-mcp && npm install && npm run build
 
-# 2. 配置凭证（内部测试一键完成）
+# 2. 配置 RPC（可选，默认用 mainnet-beta）
 bash scripts/setup.sh
 
 # 3. Register as MCP server in Claude Code
 claude mcp add byreal -- node $(pwd)/dist/index.js
 
 # 4. 重启 Claude Code → 38 个工具可用
-# 对话框里说 "帮我创建钱包，邮箱 xxx@xxx.com" 即可开始
+# 对话框里说 "帮我创建钱包" 即可开始
 ```
 
 ### Use with other MCP clients (Cursor, mcporter, etc.)
@@ -40,20 +40,10 @@ mcporter call byreal.byreal_global_overview
 ### Wallet Setup (optional — enables auto-sign for write operations)
 
 ```bash
-mkdir -p ~/.byreal-mcp
-cat > ~/.byreal-mcp/config.json << 'EOF'
-{
-  "privyAppId": "ask Stanley for credentials",
-  "privyAppSecret": "...",
-  "resendApiKey": "...",
-  "rpcUrl": "https://your-helius-or-other-rpc.com"
-}
-EOF
+# In Claude Code just say "帮我创建钱包" or call byreal_wallet_setup directly
+# A local Solana keypair is generated and saved to ~/.byreal-mcp/wallet.json
 
-# Then in Claude Code:
-#   byreal_wallet_setup → enter email → get OTP
-#   byreal_wallet_verify → enter code → wallet created
-#   ⚠️ Back up ~/.byreal-mcp/auth_key.pem — lose it = lose wallet forever
+# ⚠️ Back up ~/.byreal-mcp/wallet.json — losing it = funds are unrecoverable
 ```
 
 > **Read-only tools work without wallet config.** Wallet is only needed for swap/LP/copy operations.
