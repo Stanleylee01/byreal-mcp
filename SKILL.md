@@ -5,11 +5,11 @@ description: |
   Use when user mentions Byreal, CLMM pools, Solana DEX liquidity, or Byreal swap.
 ---
 
-# Byreal MCP Skill
+# Byreal MCP Skill v0.6.2
 
 ## What This Is
 
-Byreal is a Solana CLMM (Concentrated Liquidity Market Maker) DEX. This MCP server exposes all Byreal operations as **36 tools** for AI agents, including 3 wallet tools for fully autonomous operation.
+Byreal is a Solana CLMM (Concentrated Liquidity Market Maker) DEX. This MCP server exposes all Byreal operations as **41 tools** for AI agents, including wallet tools for fully autonomous operation.
 
 CLMM = you set a price range; liquidity only earns fees while the price is inside your range.
 
@@ -19,16 +19,17 @@ CLMM = you set a price range; liquidity only earns fees while the price is insid
 # Build first (required)
 cd ~/clawd/byreal-mcp && npm run build
 
-# Register with mcporter
+# Claude Code
+claude mcp add byreal -- node ~/clawd/byreal-mcp/dist/index.js
+
+# mcporter (OpenClaw)
 mcporter config add byreal --stdio "node ~/clawd/byreal-mcp/dist/index.js"
 
-# Or set env vars for better RPC / proxy
-BYREAL_API_BASE=https://api2.byreal.io/byreal/api \
-SOL_RPC=https://your-rpc-endpoint.com \
-mcporter config add byreal --stdio "node ~/clawd/byreal-mcp/dist/index.js"
+# Cursor — add to .cursor/mcp.json:
+# { "byreal": { "command": "node", "args": ["~/clawd/byreal-mcp/dist/index.js"] } }
 
 # Verify
-mcporter list byreal    # should list 36 tools
+mcporter list byreal    # should list 41 tools
 ```
 
 ## Quick Test
@@ -37,63 +38,73 @@ mcporter list byreal    # should list 36 tools
 mcporter call byreal.byreal_global_overview
 mcporter call byreal.byreal_market_overview
 mcporter call byreal.byreal_list_pools --args '{"pageSize":5}'
-mcporter call byreal.byreal_token_price --args '{"tokenSymbolOrMint":"SOL"}'
+mcporter call byreal.byreal_pool_analyze --args '{"poolAddress":"9KWAAyaYF7nmMWzirnBmVhE1q4YXPHcXjzfi6YreNtDY","amountUsd":1000}'
+mcporter call byreal.byreal_easy_swap --args '{"fromToken":"SOL","toToken":"USDC","amount":"0.01","dryRun":true}'
 ```
 
-## Tool Categories
+## Tool Categories (41 tools)
 
-### Pools (read)
-- **`byreal_list_pools`** — List pools sorted by TVL/volume/APR. Start here to find active pools.
+### Pools (5)
+- **`byreal_list_pools`** — List pools sorted by TVL/volume/APR.
 - **`byreal_pool_info`** — Get TVL/APR/volume for specific pool addresses.
-- **`byreal_pool_details`** — Comprehensive single-pool info including price changes.
-- **`byreal_pool_live_price`** — Live price for any token pair via Router swap quote.
+- **`byreal_pool_details`** — Comprehensive single-pool info with price changes.
+- **`byreal_pool_live_price`** — Live price for any token pair via Router.
+- **`byreal_pool_analyze`** ★ — Multi-range APR analysis, risk factors, investment projection. Best tool for LP decisions.
 
-### Swap
-- **`byreal_swap_quote`** — Get quote without wallet. Shows impact, min received, route.
-- **`byreal_swap_transaction`** — Build unsigned swap tx. User signs externally.
+### Swap (3)
+- **`byreal_swap_quote`** — Get quote without wallet (raw lamport amounts).
+- **`byreal_swap_transaction`** — Build unsigned swap tx (raw amounts, manual sign).
+- **`byreal_easy_swap`** ★ — Human-friendly swap: symbol resolution + decimal conversion + auto-sign + `dryRun` mode + error suggestions.
 
-### Positions (read)
-- **`byreal_list_positions`** — All LP positions for a wallet. Shows PnL, fees, status.
-- **`byreal_position_detail`** — Details for a specific position by address.
+### Positions — Read (8)
+- **`byreal_list_positions`** — All LP positions for a wallet with PnL summary.
+- **`byreal_position_analyze`** ★ — Position health check with pool context enrichment.
+- **`byreal_calculate_apr`** — Estimate APR for a hypothetical deposit.
+- **`byreal_position_detail`** — Full detail for a specific position address.
+- **`byreal_position_overview`** — Aggregate position stats for a wallet.
 - **`byreal_position_pnl`** — PnL breakdown: deposit, fees, rewards, bonus, net.
-- **`byreal_unclaimed_fees`** — Check what's claimable without collecting it.
-- **`byreal_create_position_info`** — Preview token amounts before opening a position.
-- **`byreal_calculate_apr`** — Estimate APR for a deposit on a given pool.
+- **`byreal_unclaimed_fees`** — Check what's claimable without collecting.
+- **`byreal_create_position_info`** — Preview token amounts before opening.
 
-### Liquidity (write → unsigned tx)
-- **`byreal_open_position`** — Open a new CLMM position. Returns unsigned base64 tx.
-- **`byreal_close_position`** — Close a position (removes all liquidity). Returns unsigned tx.
-- **`byreal_add_liquidity`** — Add more tokens to an existing position.
-- **`byreal_remove_liquidity`** — Remove N% of liquidity from a position.
-- **`byreal_submit_liquidity_tx`** — Broadcast signed liquidity tx via Byreal API.
-- **`byreal_collect_fees_tx`** — Build tx to collect trading fees from positions.
-- **`byreal_claim_rewards_tx`** — Build tx to claim incentive rewards or bonuses.
-- **`byreal_submit_claim`** — Submit signed reward claim tx (needs orderCode).
+### Liquidity — Write (8)
+- **`byreal_open_position`** — Open new CLMM position. Supports `amountUsd` for auto token split.
+- **`byreal_close_position`** — Close a position and remove all liquidity.
+- **`byreal_add_liquidity`** — Add more tokens to existing position.
+- **`byreal_remove_liquidity`** — Remove N% of liquidity.
+- **`byreal_submit_liquidity_tx`** — Broadcast signed liquidity tx.
+- **`byreal_collect_fees_tx`** — Build tx to collect trading fees.
+- **`byreal_claim_rewards_tx`** — Build tx to claim incentive rewards.
+- **`byreal_submit_claim`** — Submit signed reward claim tx.
 
-### CopyFarmer
+### CopyFarmer (5)
 - **`byreal_top_farmers`** — Leaderboard of farmers ranked by PnL.
-- **`byreal_top_positions`** — Leaderboard of positions ranked by PnL.
+- **`byreal_top_positions`** — Top positions with sortField (liquidity/apr/earned/pnl/copies/bonus) + status filter (open/closed). Best for finding copy targets.
+- **`byreal_farmer_positions`** — All positions for a specific farmer.
 - **`byreal_copyfarmer_overview`** — Global CopyFarmer program stats.
-- **`byreal_copy_position`** — Copy a top farmer's position tick range. Writes memo with `REFERER_POSITION` for on-chain tracking.
+- **`byreal_copy_position`** — Copy a farmer's tick range. Supports `amountUsd`. Records referral on-chain.
 
-### Market Data
+### Market Data (6)
 - **`byreal_global_overview`** — DEX-wide TVL, volume, fees (24h + all-time).
 - **`byreal_mint_prices`** — Batch price lookup for up to 20 tokens.
 - **`byreal_mint_list`** — Search/list tokens available on Byreal.
 - **`byreal_hot_tokens`** — Trending tokens.
-- **`byreal_kline`** — K-line (OHLCV) data for any token.
-- **`byreal_pool_details`** — Also shows price changes (1h/24h/7d).
+- **`byreal_kline`** — K-line (OHLCV) candlestick data.
+- **`byreal_dynamic_fee`** — Current dynamic fee rates.
 
-### Orders & Tokens
-- **`byreal_order_history`** — Swap order history for a wallet.
-- **`byreal_token_price`** — USD price by symbol (SOL, bbSOL) or mint.
+### Orders & Tokens (5)
+- **`byreal_order_history`** — Swap order history.
+- **`byreal_list_orders`** — Active limit orders.
+- **`byreal_token_price`** — USD price by symbol or mint.
 - **`byreal_market_overview`** — Quick snapshot: SOL, bbSOL, USDT prices.
-- **`byreal_known_tokens`** — List known mint addresses and decimals.
+- **`byreal_known_tokens`** — Known mint addresses and decimals.
 
-### Wallet (auto-sign)
-- **`byreal_wallet_setup`** — Generate a local Solana keypair. Saved to `~/.byreal-mcp/wallet.json` (chmod 600).
+### Wallet (3)
+- **`byreal_wallet_setup`** — Generate a local Solana keypair (or use `keypairPath` in wallet.json).
 - **`byreal_wallet_status`** — Check wallet address, SOL/USDC balance.
-- **`byreal_sign_and_send`** — Sign an unsigned tx with local keypair + broadcast to Solana. Returns signature.
+- **`byreal_sign_and_send`** — Sign unsigned tx + broadcast. Returns signature.
+
+### Discovery (1)
+- **`byreal_catalog`** — List all tools. Search by keyword. Agent self-discovery.
 
 ## Wallet Setup
 
@@ -101,134 +112,77 @@ mcporter call byreal.byreal_token_price --args '{"tokenSymbolOrMint":"SOL"}'
 ```bash
 bash scripts/setup.sh
 # → writes ~/.byreal-mcp/config.json with rpcUrl + heliusApiKey
-# → get your free Helius API key at https://helius.dev
 ```
 
-### Wallet Onboarding Flow
+### Wallet — Option A: Generate new
 ```
 byreal_wallet_setup
-  → generates local Solana Ed25519 keypair
-  → saves to ~/.byreal-mcp/wallet.json (chmod 600)
-  → returns wallet address
-[Fund the wallet with SOL + target tokens]
+  → generates Ed25519 keypair → saves to ~/.byreal-mcp/wallet.json
 ```
 
-### Auto-Sign Mode
-Once wallet is configured, **all write tools automatically sign and broadcast**:
-```
-byreal_open_position poolAddress=..., userAddress=..., ...
-  → builds tx → auto-signs with local keypair → broadcasts → returns {signature, explorerUrl}
+### Wallet — Option B: Use existing keypair
+Edit `~/.byreal-mcp/wallet.json`:
+```json
+{ "keypairPath": "/path/to/your/id.json" }
 ```
 
-No manual signing needed. The `userAddress` must match the configured wallet.
-
-### Wallet Security Model
-- **Local keypair**: Standard Solana Ed25519 keypair stored at `~/.byreal-mcp/wallet.json`
-- **Self-custodial**: You hold the private key. Export to Phantom or any Solana wallet anytime.
-- **Back up wallet.json**: If lost, the wallet and funds are inaccessible. No recovery mechanism.
-- **chmod 600**: File permissions restrict access to your user account only.
+### Auto-Sign
+Once wallet is configured, all write tools automatically sign and broadcast:
+```
+byreal_easy_swap → quote → sign with local keypair → broadcast → {signature, explorerUrl}
+```
 
 ## Common Workflows
 
-### 0. First-Time Setup (Wallet + Fund)
+### 1. Analyze & Open Position
 ```
-byreal_wallet_setup
-  → keypair generated, wallet address returned
-byreal_wallet_status
-  → shows address, balance
-[Fund the wallet with SOL + target tokens]
-```
-
-### 1. Check a Pool Before Investing
-```
-byreal_list_pools (sort by feeApr24h, desc)
-  → note poolAddress of a good pool
-byreal_pool_details poolAddress=...
-  → see full stats, price changes, fee rate
-byreal_calculate_apr poolAddress=..., depositUsd=1000
-  → estimate your APR
+byreal_pool_analyze poolAddress=..., amountUsd=1000, ranges="5,10,20"
+  → multi-range APR, risk, projection
+byreal_open_position poolAddress=..., priceLower=..., priceUpper=..., amountUsd=100
+  → auto-split tokens, build tx, sign, broadcast
 ```
 
-### 2. Open a New Position
+### 2. Copy a Top Farmer
 ```
-byreal_pool_details poolAddress=...
-  → confirm current price and fee rate
-byreal_create_position_info poolAddress=..., priceLower=..., priceUpper=..., baseToken=A, baseAmount="100"
-  → preview token amounts needed
-byreal_open_position poolAddress=..., priceLower=..., priceUpper=..., baseToken=A, baseAmount="100", userAddress=...
-  → returns base64 unsigned tx
-[User signs with their wallet]
-byreal_submit_liquidity_tx signedTransactions=[...]
-  → broadcast to Solana
+byreal_top_positions poolAddress=..., sortField=earned, pageSize=5
+  → find best position
+byreal_copy_position positionAddress=..., amountUsd=100
+  → replicate tick range + referral memo
 ```
 
-### 3. Monitor & Collect Fees
+### 3. Swap with Preview
+```
+byreal_easy_swap fromToken=SOL, toToken=USDC, amount=1.5, dryRun=true
+  → preview quote without executing
+byreal_easy_swap fromToken=SOL, toToken=USDC, amount=1.5
+  → execute the swap
+```
+
+### 4. Monitor Positions
 ```
 byreal_list_positions walletAddress=...
-  → check all open positions and PnL
-byreal_unclaimed_fees userAddress=...
-  → see what's claimable
-byreal_collect_fees_tx walletAddress=...
-  → build fee collection tx(s)
-[Sign each tx]
-byreal_submit_liquidity_tx signedTransactions=[...]
-```
-
-### 4. Close a Position
-```
-byreal_list_positions walletAddress=...
-  → find nftMintAddress of position to close
-byreal_close_position nftMint=..., userAddress=...
-  → shows current amounts + fee, returns unsigned tx
-[Sign tx]
-byreal_submit_liquidity_tx signedTransactions=[...]
-```
-
-### 5. Copy Farm Workflow
-```
-byreal_top_farmers pageSize=5
-  → find a profitable farmer (note providerAddress)
-byreal_top_positions pageSize=5 (optionally filter by poolAddress)
-  → find their best open position (status 🟢, note positionAddress)
-byreal_position_detail address=<positionAddress>
-  → confirm tick range, pool, PnL
-byreal_copy_position positionAddress=..., userAddress=..., baseToken=A, baseAmount="50"
-  → build tx with same tick range + REFERER_POSITION memo
-[Sign tx]
-byreal_submit_liquidity_tx signedTransactions=[...]
+  → all positions with PnL
+byreal_position_analyze walletAddress=..., nftMint=...
+  → specific position health + pool context
 ```
 
 ## Important Concepts
 
-### Unsigned Transaction Workflow
-All write operations (open/close/add/remove/swap) build **unsigned** base64 transactions. Two modes:
-1. **Auto-sign (wallet configured)**: The tool automatically signs with local keypair and broadcasts. Returns `{signature, explorerUrl}`.
-2. **Manual sign (no wallet)**: Returns unsigned base64 tx. Sign externally (Phantom, hardware wallet), then call `byreal_submit_liquidity_tx`.
+### Amount Units
+- `baseAmount` / `amountUsd` in position tools → **UI units** or **USD**
+- `amount` in `byreal_swap_quote` / `byreal_swap_transaction` → **raw lamports**
+- `byreal_easy_swap` uses **UI units** (e.g. `"1.5"` = 1.5 SOL)
 
-### Amount Units — UI vs Raw
-- `baseAmount` in `byreal_open_position`, `byreal_copy_position`, `byreal_add_liquidity` → **UI units** (e.g. `"50"` = 50 USDC)
-- `amount` in `byreal_swap_quote` / `byreal_swap_transaction` → **raw lamports** (e.g. `"1000000000"` = 1 SOL)
-- Always use `byreal_known_tokens` to check decimals if unsure
+### amountUsd Auto-Split
+Linear price approximation: `ratioA = (pU - pC) / (pU - pL)`. Accurate to ~1-2%.
+Below range → all token A. Above range → all token B.
 
-### Tick Alignment
-CLMM positions snap to the pool's `tickSpacing`. The SDK handles alignment automatically — pass the desired price as a decimal string (e.g. `"0.985"`) and ticks are computed. Never manually pre-align ticks.
-
-### Slippage
-Default slippage is `0.02` (2%). For volatile pairs or wide price ranges, increase to `0.05`. For stablecoin pairs, `0.005` is fine.
-
-### Copy Farm Memo
-`byreal_copy_position` passes `REFERER_POSITION=<positionAddress>` to the SDK script, which encodes it as a transaction memo. The Byreal CLMM program reads this memo to attribute your position to the farmer. This is **verified on mainnet**.
-
-### byreal_pool_info is POST
-The `/pools/info/ids` endpoint is a POST endpoint. Using GET returns empty results. The tool handles this correctly internally.
-
-## Known Limitations
-
-1. **Proxy in China**: SDK subprocess calls go to `SOL_RPC`. Without `HTTPS_PROXY`, write ops time out in mainland China.
-2. **SDK requires Node.js**: The SDK subprocess uses `npx tsx`. Node must be in `PATH`.
-3. **WebSocket confirmation**: SDK scripts poll for confirmation; they may report "finalized" slightly early.
-4. **Reward claims need orderCode**: `byreal_claim_rewards_tx` returns an `orderCode`. You must include it in `byreal_submit_claim`. Don't lose it.
-5. **Position must be open to copy**: `byreal_copy_position` will error if the source position is closed (status ≠ 0).
+### Error Recovery
+All write operations include contextual `💡 Suggestions`:
+- Insufficient balance → check wallet + suggest swap
+- Blockhash expired → retry
+- Slippage → increase bps
+- Unknown token → use mint or check known_tokens
 
 ## Key Addresses
 
@@ -239,3 +193,10 @@ The `/pools/info/ids` endpoint is a POST endpoint. Using GET returns empty resul
 | USDC | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
 | SOL | `So11111111111111111111111111111111111111112` |
 | bbSOL | `Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B` |
+
+## Known Limitations
+
+1. **Proxy in China**: SDK subprocesses need `HTTPS_PROXY` for RPC calls.
+2. **amountUsd is approximate**: Linear interpolation, not full CLMM tick math.
+3. **SDK requires Node.js**: Uses `npx tsx`. Node must be in `PATH`.
+4. **Reward claims need orderCode**: Don't lose it between `claim_rewards_tx` and `submit_claim`.

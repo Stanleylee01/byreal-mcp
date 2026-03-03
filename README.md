@@ -1,10 +1,22 @@
-# Byreal MCP Server v0.5.0
+# Byreal MCP Server v0.6.2
 
 MCP server for [Byreal DEX](https://www.byreal.io) — Solana CLMM with CEX-grade liquidity.
 
 Exposes all Byreal operations as MCP tools for AI agents via the [Model Context Protocol](https://modelcontextprotocol.io).
 
-**36 tools** covering: pools, swap, positions, liquidity management, copy farming, market data, orders, tokens, and **wallet management with auto-sign**.
+**41 tools** covering: pools, swap, positions, liquidity management, copy farming, market data, orders, tokens, wallet management with auto-sign, and **intelligent analysis tools**.
+
+## What's New in v0.6
+
+- **`byreal_pool_analyze`** — Multi-range APR analysis with risk factors and investment projections
+- **`byreal_position_analyze`** — Position health check with pool context enrichment
+- **`byreal_easy_swap`** — Human-friendly swap: `fromToken="SOL" toToken="USDC" amount="1.5"` — one call does quote + sign + send
+- **`amountUsd` mode** — Open or copy positions with `amountUsd=100` — auto-calculates token A/B split based on current price and range
+- **`dryRun` mode** — Preview any swap without executing: `dryRun=true`
+- **Error recovery suggestions** — Context-aware `💡 Suggestions` on every error (insufficient balance → check wallet, slippage → increase bps, etc.)
+- **`byreal_catalog`** — Agent self-discovery: search tools by keyword
+- **Expanded CopyFarmer** — `top_positions` with sortField/status filter, `farmer_positions`, `top_farmers`
+- **`keypairPath` wallet** — Use an existing Solana keypair file instead of generating a new one
 
 ## Quick Start
 
@@ -15,35 +27,47 @@ Exposes all Byreal operations as MCP tools for AI agents via the [Model Context 
 git clone https://github.com/Stanleylee01/byreal-mcp.git
 cd byreal-mcp && npm install && npm run build
 
-# 2. 配置 RPC（获取免费 Helius API key: https://helius.dev）
+# 2. Configure RPC (get free Helius API key: https://helius.dev)
 bash scripts/setup.sh
 
 # 3. Register as MCP server in Claude Code
 claude mcp add byreal -- node $(pwd)/dist/index.js
 
-# 4. 重启 Claude Code → 36 个工具可用
-# 对话框里说 "帮我创建钱包" 即可开始
+# 4. Restart Claude Code → 41 tools available
+# Say "帮我创建钱包" to get started
 ```
 
-### Use with other MCP clients (Cursor, mcporter, etc.)
+### Use with Cursor
+
+Add to `.cursor/mcp.json`:
+```json
+{
+  "byreal": {
+    "command": "node",
+    "args": ["/path/to/byreal-mcp/dist/index.js"]
+  }
+}
+```
+
+### Use with mcporter (OpenClaw)
 
 ```bash
-# mcporter
-mcporter config add byreal --stdio "node /path/to/byreal-mcp/dist/index.js"
-mcporter list byreal
+mcporter config add byreal --stdio "node ~/clawd/byreal-mcp/dist/index.js"
+mcporter list byreal    # should list 41 tools
 mcporter call byreal.byreal_global_overview
-
-# Cursor — add to .cursor/mcp.json:
-# { "byreal": { "command": "node", "args": ["/path/to/byreal-mcp/dist/index.js"] } }
 ```
 
 ### Wallet Setup (optional — enables auto-sign for write operations)
 
 ```bash
-# In Claude Code just say "帮我创建钱包" or call byreal_wallet_setup directly
-# A local Solana keypair is generated and saved to ~/.byreal-mcp/wallet.json
+# Option A: Generate new keypair
+# In Claude Code just say "帮我创建钱包" or call byreal_wallet_setup
 
-# ⚠️ Back up ~/.byreal-mcp/wallet.json — losing it = funds are unrecoverable
+# Option B: Use existing keypair file
+# Edit ~/.byreal-mcp/wallet.json:
+# { "keypairPath": "/path/to/your/id.json" }
+
+# ⚠️ Back up your wallet — losing it = funds are unrecoverable
 ```
 
 > **Read-only tools work without wallet config.** Wallet is only needed for swap/LP/copy operations.
@@ -57,127 +81,137 @@ mcporter call byreal.byreal_global_overview
 | `SOL_ENDPOINT` | _(same as SOL_RPC)_ | Alias accepted by SDK scripts |
 | `HTTPS_PROXY` | _(unset)_ | HTTP proxy for SDK subprocess calls (needed in China) |
 
-## Tools (36 total)
+## Tools (41 total)
 
-### Pools
+### Pools (5)
 | Tool | Description |
 |------|-------------|
 | `byreal_list_pools` | List pools sorted by TVL, volume, fees, or APR |
-| `byreal_pool_info` | Get detailed info for one or more pools by address |
-| `byreal_pool_details` | Get comprehensive single-pool details with price changes |
-| `byreal_pool_live_price` | Get live price for any token pair via Router |
+| `byreal_pool_info` | Get info for one or more pools by address |
+| `byreal_pool_details` | Comprehensive single-pool details with price changes |
+| `byreal_pool_live_price` | Live price for any token pair via Router |
+| `byreal_pool_analyze` | **NEW** Multi-range APR analysis, risk factors, investment projection |
 
-### Swap
+### Swap (3)
 | Tool | Description |
 |------|-------------|
-| `byreal_swap_quote` | Get swap quote without a wallet (price, impact, min received) |
-| `byreal_swap_transaction` | Build unsigned swap transaction ready to sign |
+| `byreal_swap_quote` | Get quote without wallet (raw lamport amounts) |
+| `byreal_swap_transaction` | Build unsigned swap tx (raw lamports, manual sign) |
+| `byreal_easy_swap` | **NEW** Human-friendly swap with `dryRun` mode + error suggestions |
 
-### Positions (read)
+### Positions — Read (8)
 | Tool | Description |
 |------|-------------|
 | `byreal_list_positions` | List all LP positions for a wallet with PnL summary |
-| `byreal_calculate_apr` | Estimate APR for a hypothetical deposit on a pool |
+| `byreal_position_analyze` | **NEW** Position health check with pool context enrichment |
+| `byreal_calculate_apr` | Estimate APR for a hypothetical deposit |
 | `byreal_position_detail` | Full detail for a specific position address |
 | `byreal_position_overview` | Aggregate position stats for a wallet |
 | `byreal_position_pnl` | Detailed PnL breakdown (deposit, fees, rewards, bonus) |
-| `byreal_unclaimed_fees` | Check unclaimed fees and rewards for a wallet |
-| `byreal_create_position_info` | Preview a position's token amounts before opening |
+| `byreal_unclaimed_fees` | Check what's claimable without collecting |
+| `byreal_create_position_info` | Preview token amounts before opening |
 
-### Liquidity (write — returns unsigned tx)
+### Liquidity — Write (8)
 | Tool | Description |
 |------|-------------|
-| `byreal_open_position` | Build unsigned tx to open a new CLMM position |
-| `byreal_close_position` | Build unsigned tx to close a position and remove all liquidity |
-| `byreal_add_liquidity` | Build unsigned tx to add more liquidity to an existing position |
-| `byreal_remove_liquidity` | Build unsigned tx to remove a % of liquidity from a position |
-| `byreal_submit_liquidity_tx` | Submit signed tx(s) for open/close/add/remove operations |
-| `byreal_collect_fees_tx` | Build unsigned tx(s) to collect trading fees |
-| `byreal_claim_rewards_tx` | Build unsigned tx(s) to claim incentive rewards or bonuses |
-| `byreal_submit_claim` | Submit signed reward/bonus claim transactions |
+| `byreal_open_position` | Open new CLMM position. Supports `amountUsd` auto-split |
+| `byreal_close_position` | Close position, remove all liquidity |
+| `byreal_add_liquidity` | Add more tokens to existing position |
+| `byreal_remove_liquidity` | Remove N% of liquidity |
+| `byreal_submit_liquidity_tx` | Broadcast signed liquidity tx |
+| `byreal_collect_fees_tx` | Build tx to collect trading fees |
+| `byreal_claim_rewards_tx` | Build tx to claim incentive rewards |
+| `byreal_submit_claim` | Submit signed reward claim tx |
 
-### CopyFarmer
+### CopyFarmer (5)
 | Tool | Description |
 |------|-------------|
-| `byreal_top_farmers` | Leaderboard of top LP farmers sorted by PnL |
-| `byreal_top_positions` | Leaderboard of top individual positions |
+| `byreal_top_farmers` | Leaderboard of top LP farmers |
+| `byreal_top_positions` | Top positions with sortField (liquidity/apr/earned/pnl/copies) + status filter |
+| `byreal_farmer_positions` | All positions for a specific farmer |
 | `byreal_copyfarmer_overview` | Global CopyFarmer program stats |
-| `byreal_copy_position` | Build unsigned tx to replicate a top farmer's position (with memo) |
+| `byreal_copy_position` | Copy a farmer's position. Supports `amountUsd` auto-split |
 
-### Market Data
+### Market Data (6)
 | Tool | Description |
 |------|-------------|
 | `byreal_global_overview` | DEX-wide TVL, volume, fees (24h + all-time) |
-| `byreal_mint_prices` | Batch USD price lookup for up to 20 tokens |
-| `byreal_mint_list` | Search and list all tokens on Byreal |
-| `byreal_hot_tokens` | Trending tokens on Byreal |
-| `byreal_kline` | K-line (candlestick) data for any token |
+| `byreal_mint_prices` | Batch USD price lookup (up to 20 tokens) |
+| `byreal_mint_list` | Search/list all tokens on Byreal |
+| `byreal_hot_tokens` | Trending tokens |
+| `byreal_kline` | K-line (OHLCV) candlestick data |
+| `byreal_dynamic_fee` | Current dynamic fee rates |
 
-### Orders
+### Orders (2)
 | Tool | Description |
 |------|-------------|
 | `byreal_order_history` | Swap/trade order history for a wallet |
+| `byreal_list_orders` | List active limit orders |
 
-### Tokens
+### Tokens (3)
 | Tool | Description |
 |------|-------------|
-| `byreal_token_price` | Live USD price for any token (by symbol or mint) |
+| `byreal_token_price` | Live USD price by symbol or mint |
 | `byreal_market_overview` | Quick price snapshot: SOL, bbSOL, USDT |
-| `byreal_known_tokens` | List all known tokens with mint addresses and decimals |
+| `byreal_known_tokens` | List known mint addresses and decimals |
 
-### Wallet (auto-sign)
+### Wallet (3)
 | Tool | Description |
 |------|-------------|
-| `byreal_wallet_setup` | Generate a local Solana keypair, saved to `~/.byreal-mcp/wallet.json` |
-| `byreal_wallet_status` | Check wallet address, SOL/USDC balance |
-| `byreal_sign_and_send` | Sign unsigned tx with local keypair + broadcast to Solana |
+| `byreal_wallet_setup` | Generate local Solana keypair |
+| `byreal_wallet_status` | Check address, SOL/USDC balance |
+| `byreal_sign_and_send` | Sign unsigned tx + broadcast to Solana |
 
-## Write Operations
+### Discovery (1)
+| Tool | Description |
+|------|-------------|
+| `byreal_catalog` | List all tools with descriptions. Search by keyword. |
 
-All write operations build **unsigned base64 transactions**. Two modes:
+## Key Features
 
-### Auto-Sign Mode (recommended)
-When wallet is configured (`~/.byreal-mcp/wallet.json`), write tools automatically sign and broadcast:
+### amountUsd Mode (v0.6)
+Instead of manually calculating token amounts:
 ```
-byreal_open_position → builds tx → local keypair signs → Solana broadcast → {signature, explorerUrl}
+byreal_open_position({
+  poolAddress: "...",
+  priceLower: "80", priceUpper: "90",
+  amountUsd: 100,      // ← invest $100, auto-split A/B
+  userAddress: "..."
+})
 ```
+Works for `open_position` and `copy_position`. Auto-fetches current prices from pool details.
 
-### Manual Mode
-Without wallet config, tools return unsigned base64 tx for external signing:
+### dryRun Mode (v0.6)
+Preview any swap without executing:
 ```
-1. Call tool → get base64 unsigned tx
-2. Sign with your wallet (Phantom, hardware wallet, etc.)
-3. Submit signed tx via byreal_submit_liquidity_tx
-```
-
-### Wallet Config
-```bash
-# Run setup script (writes RPC config to ~/.byreal-mcp/config.json)
-bash scripts/setup.sh
-
-# Then create wallet via MCP:
-# byreal_wallet_setup → wallet.json created automatically
-```
-
-Tools that build transactions via SDK subprocess (open/close/add/remove/copy) require `SOL_RPC` to be set for on-chain data fetching.
-
-## Copy Farm
-
-Copy Farm lets you replicate a top farmer's position tick range with your own capital.
-
-```
-1. byreal_top_farmers        → find a top farmer
-2. byreal_top_positions      → see their open positions
-3. byreal_position_detail    → get position details
-4. byreal_copy_position      → build tx with same tick range
-                                 (inserts REFERER_POSITION memo)
-5. Sign tx (auto or manual)
-6. byreal_submit_liquidity_tx → broadcast (manual mode only)
+byreal_easy_swap({
+  fromToken: "SOL", toToken: "USDC", amount: "1.5",
+  dryRun: true          // ← quote only, no tx
+})
 ```
 
-The `REFERER_POSITION` memo links your position to the original farmer — this is verified on-chain by the Byreal CopyFarmer program.
+### Error Recovery Suggestions (v0.6)
+Every error includes actionable next steps:
+```
+❌ Execution failed: insufficient funds
+💡 Suggestions:
+  • Check balance: byreal_wallet_status
+  • You may need more SOL for gas
+  • Try a smaller amount
+```
 
-**Note**: Use `baseAmount` in UI units (e.g. `"50"` = 50 of Token A), not raw lamports.
+### Auto-Sign Mode
+When wallet is configured, write tools automatically sign and broadcast:
+```
+byreal_easy_swap → quote → sign with local keypair → broadcast → {signature, explorerUrl}
+```
+
+### Copy Farm
+```
+1. byreal_top_positions → find top farmer by earned/pnl
+2. byreal_copy_position → replicate their tick range with amountUsd
+```
+Inserts `REFERER_POSITION` memo for on-chain copy bonus tracking.
 
 ## Architecture
 
@@ -186,26 +220,22 @@ byreal-mcp/
 ├── src/
 │   ├── index.ts              — MCP server entry, transport, tool registration
 │   ├── config.ts             — Chain client, API endpoints, fetch helpers
-│   ├── wallet.ts             — Local keypair generation, signing, balance queries
+│   ├── wallet.ts             — Keypair management, signing, balance queries
 │   └── tools/
-│       ├── pools.ts          — Pool queries (list, info, details, live price)
-│       ├── swap.ts           — Swap quote + unsigned transaction
-│       ├── positions.ts      — Position list, APR, overview, detail
-│       ├── liquidity.ts      — All write ops: open/close/add/remove + fee/reward collection
-│       ├── copyfarmer.ts     — Top farmers, top positions, overview leaderboards
-│       ├── market.ts         — Global overview, prices, klines, hot tokens
-│       ├── orders.ts         — Order history, position detail, overview
-│       ├── tokens.ts         — Token prices, market overview, known tokens
-│       └── wallet.ts         — Wallet MCP tool definitions
+│       ├── pools.ts          — Pool queries + pool_analyze
+│       ├── swap.ts           — Swap quote + easy_swap with dryRun
+│       ├── positions.ts      — Position list + position_analyze
+│       ├── liquidity.ts      — Open/close/add/remove + copy with amountUsd
+│       ├── copyfarmer.ts     — Top farmers, top positions, farmer overview
+│       ├── market.ts         — Global overview, prices, klines, dynamic fees
+│       ├── orders.ts         — Order history
+│       ├── tokens.ts         — Token prices, known tokens
+│       ├── wallet.ts         — Wallet tool definitions
+│       └── catalog.ts        — Tool discovery catalog
 ├── sdk-ref/                  — @byreal/clmm-sdk (DO NOT MODIFY)
 │   └── src/scripts/          — SDK scripts for building transactions
-│       ├── create-position.ts
-│       ├── close-position.ts
-│       ├── add-liquidity.ts
-│       ├── decrease-liquidity.ts
-│       └── proxy-setup.ts
 ├── scripts/
-│   └── setup.sh              — One-line config setup (writes ~/.byreal-mcp/config.json)
+│   └── setup.sh              — One-line config setup
 ├── dist/                     — Compiled JS (npm run build)
 └── package.json
 ```
@@ -216,29 +246,39 @@ byreal-mcp/
 |----------|---------|
 | CLMM Program | `REALQqNEomY6cQGZJUGwywTBD2UmDT32rZcNnfxQ5N2` |
 | Router | `REALp6iMBDTctQqpmhBo4PumwJGcybbnDpxtax3ara3` |
-| Reset Launchpad | `REALdpFGDDsiD9tvxYsXBTDpgH1gGQEqJ8YSLdYQWGD` |
-| RFQ | `REALFP9S4VmrAixmeYa68FrPKn4NVD2QFxxMfz9arhz` |
+| USDC | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
+| SOL | `So11111111111111111111111111111111111111112` |
+| bbSOL | `Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B` |
 
 ## Known Limitations
 
-- **Proxy required in China**: SDK subprocesses use `HTTPS_PROXY` for on-chain RPC calls. Without it, write operations will time out.
-- **Tick alignment**: CLMM positions snap to the pool's `tickSpacing`. The SDK handles this automatically — don't pre-align prices.
-- **`byreal_pool_info` uses POST**: The `/pools/info/ids` endpoint is a POST endpoint; sending a GET returns empty results.
+- **Proxy required in China**: SDK subprocesses use `HTTPS_PROXY` for on-chain RPC calls.
+- **Tick alignment**: CLMM positions snap to pool's `tickSpacing`. SDK handles this — don't pre-align.
+- **amountUsd is approximate**: Uses linear price interpolation, not full CLMM tick math. Accurate to ~1-2%.
+- **SDK requires Node.js**: Scripts use `npx tsx`. Node must be in `PATH`.
 
-## Roadmap
+## Changelog
 
-### v0.5 ✅ Current
-- 36 tools operational
-- Local keypair wallet (generate, sign, broadcast)
-- Auto-sign for all write operations
+### v0.6.2 (2026-03-03)
+- `byreal_pool_analyze` — multi-range APR + risk assessment
+- `byreal_position_analyze` — position health + pool context
+- `byreal_easy_swap` — human-friendly with `dryRun` mode
+- `amountUsd` mode for `open_position` + `copy_position`
+- Error recovery `💡 Suggestions` on all write ops
+- `byreal_catalog` — agent self-discovery
+- `keypairPath` wallet support
+- Fixed: pool_info 404, pool_analyze field mapping, signAndSend blockhash refresh
+- Expanded CopyFarmer: sortField, status filter, farmer_positions
+
+### v0.5.0
+- 36 tools, local keypair wallet, auto-sign
 - CLMM open/close/add/remove via SDK subprocesses
-- Copy Farm with REFERER_POSITION memo (verified on mainnet)
-- Fee collection and reward claim workflows
-- CopyFarmer leaderboards and overview
+- Copy Farm with REFERER_POSITION memo
+- CopyFarmer leaderboards
 
-### v0.6 (planned)
+### Roadmap
 - Reset Launchpad integration
 - Position auto-rebalance (tick drift detection)
-- Portfolio summary (all positions + PnL aggregated)
-- Strategy recommendations (optimal range, fee tier selection)
-- Transaction spending limits for auto-sign safety
+- Portfolio summary
+- Strategy recommendations
+- Transaction spending limits
