@@ -18,11 +18,12 @@ import { registerCopyfarmerTools } from './tools/copyfarmer.js';
 import { registerOrderTools } from './tools/orders.js';
 import { registerLiquidityTools } from './tools/liquidity.js';
 import { registerWalletTools } from './tools/wallet.js';
+import { registerCatalogTools } from './tools/catalog.js';
 import { createChain } from './config.js';
 
 const server = new McpServer({
   name: 'byreal-mcp',
-  version: '0.4.0',
+  version: '0.6.1',
 });
 
 const chain = createChain();
@@ -37,11 +38,12 @@ registerCopyfarmerTools(server, chain);
 registerOrderTools(server, chain);
 registerLiquidityTools(server, chain);
 registerWalletTools(server, chain);
+registerCatalogTools(server, chain);
 
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[byreal-mcp] Server v0.3.0 started on stdio');
+  console.error('[byreal-mcp] Server v0.6.0 started on stdio');
 }
 
 main().catch((err) => {

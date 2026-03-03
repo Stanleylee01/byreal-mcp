@@ -10,7 +10,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { ChainClient, API_ENDPOINTS, apiPost, KNOWN_TOKENS } from '../config.js';
+import { ChainClient, API_ENDPOINTS, apiPost, KNOWN_TOKENS, resolveToken } from '../config.js';
 import { loadWallet, loadConfig, signAndSend } from '../wallet.js';
 
 interface SwapResult {
@@ -146,6 +146,154 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
           ].join('\n'),
         }],
       };
+    }
+  );
+
+  // ─── High-level combo tool ───────────────────────────────────────────────
+  server.tool(
+    'byreal_easy_swap',
+    'One-shot swap using human-friendly token symbols and amounts. Resolves symbols → mints, converts decimals, gets a quote, and auto-executes if a wallet is configured. Example: fromToken="SOL", toToken="USDC", amount="1.5".',
+    {
+      fromToken: z.string().describe('Input token symbol (e.g. "SOL", "USDC") or mint address'),
+      toToken: z.string().describe('Output token symbol (e.g. "USDC", "BONK") or mint address'),
+      amount: z.string().describe('Human-readable input amount (e.g. "1.5" for 1.5 SOL)'),
+      slippageBps: z.number().min(1).max(5000).default(50)
+        .describe('Slippage tolerance in basis points (50 = 0.5%)'),
+    },
+    async ({ fromToken, toToken, amount, slippageBps }) => {
+      // Resolve symbols to mint addresses
+      const inputMint = resolveToken(fromToken) ?? fromToken;
+      const outputMint = resolveToken(toToken) ?? toToken;
+
+      if (!KNOWN_TOKENS[inputMint] && inputMint === fromToken) {
+        return {
+          content: [{ type: 'text' as const, text: `❌ Unknown token: "${fromToken}". Use a mint address or a known symbol (SOL, USDC, USDT, BONK, JUP, WIF, …).` }],
+          isError: true,
+        };
+      }
+      if (!KNOWN_TOKENS[outputMint] && outputMint === toToken) {
+        return {
+          content: [{ type: 'text' as const, text: `❌ Unknown token: "${toToken}". Use a mint address or a known symbol.` }],
+          isError: true,
+        };
+      }
+
+      // Convert human-readable amount to lamports
+      const fromDecimals = KNOWN_TOKENS[inputMint]?.decimals ?? 9;
+      const rawAmount = Math.round(parseFloat(amount) * 10 ** fromDecimals).toString();
+
+      const inSym = tokenLabel(inputMint);
+      const outSym = tokenLabel(outputMint);
+
+      // Step 1: Get quote
+      let quoteData: SwapResult;
+      try {
+        quoteData = await apiPost<SwapResult>(API_ENDPOINTS.SWAP, {
+          inputMint,
+          outputMint,
+          amount: rawAmount,
+          swapMode: 'in',
+          slippageBps: String(slippageBps),
+          computeUnitPriceMicroLamports: '50000',
+          quoteOnly: 'true',
+        });
+      } catch (err: any) {
+        return {
+          content: [{ type: 'text' as const, text: `❌ Quote failed: ${err.message}` }],
+          isError: true,
+        };
+      }
+
+      const inAmt = toUi(quoteData.inAmount, inputMint);
+      const outAmt = toUi(quoteData.outAmount, outputMint);
+      const minOut = toUi(quoteData.otherAmountThreshold, outputMint);
+      const rate = inAmt > 0 ? outAmt / inAmt : 0;
+
+      const quoteLines = [
+        `📊 Quote: ${inAmt} ${inSym} → ${outAmt.toFixed(6)} ${outSym}`,
+        `Rate: 1 ${inSym} = ${rate.toFixed(6)} ${outSym}`,
+        `Min received: ${minOut.toFixed(6)} ${outSym} (slippage ${slippageBps / 100}%)`,
+        `Price impact: ${quoteData.priceImpactPct.toFixed(4)}%`,
+      ];
+      if (quoteData.routerType) quoteLines.push(`Router: ${quoteData.routerType}`);
+
+      // Step 2: Try to execute if wallet is available
+      const config = loadConfig();
+      const wallet = loadWallet();
+      if (!config || !wallet) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              ...quoteLines,
+              ``,
+              `⚠️ No wallet configured — quote only. Run byreal_wallet_setup to enable auto-execution.`,
+            ].join('\n'),
+          }],
+        };
+      }
+
+      // Build actual transaction
+      let txData: SwapResult;
+      try {
+        txData = await apiPost<SwapResult>(API_ENDPOINTS.SWAP, {
+          inputMint,
+          outputMint,
+          amount: rawAmount,
+          swapMode: 'in',
+          slippageBps: String(slippageBps),
+          computeUnitPriceMicroLamports: '50000',
+          userPublicKey: wallet.publicKey,
+        });
+      } catch (err: any) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [...quoteLines, ``, `❌ Transaction build failed: ${err.message}`].join('\n'),
+          }],
+          isError: true,
+        };
+      }
+
+      if (!txData.transaction) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [...quoteLines, ``, `❌ Router returned no transaction. Route may be unavailable.`].join('\n'),
+          }],
+          isError: true,
+        };
+      }
+
+      try {
+        const result = await signAndSend(txData.transaction);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              ...quoteLines,
+              ``,
+              `✅ Swap executed!`,
+              `Signature: ${result.signature}`,
+              `Explorer: https://solscan.io/tx/${result.signature}`,
+            ].join('\n'),
+          }],
+        };
+      } catch (err: any) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              ...quoteLines,
+              ``,
+              `❌ Execution failed: ${err.message}`,
+              `Transaction (base64) for manual signing:`,
+              txData.transaction,
+            ].join('\n'),
+          }],
+          isError: true,
+        };
+      }
     }
   );
 }

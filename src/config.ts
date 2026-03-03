@@ -18,6 +18,8 @@ export const API_ENDPOINTS = {
   // Pool data (v2)
   POOLS_LIST: `${API_BASE}/dex/v2/pools/info/list`,
   POOLS_BY_IDS: `${API_BASE}/dex/v2/pools/info/ids`,
+  POOL_DETAILS: `${API_BASE}/dex/v2/pools/details`,
+  POOL_KLINES: `${API_BASE}/dex/v2/kline/query-ui`,
   // Positions (v2)
   MY_POSITIONS: `${API_BASE}/dex/v2/position/list`,
   // Swap (Router)
@@ -33,7 +35,49 @@ export const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> 
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': { symbol: 'USDT', decimals: 6 },
   'So11111111111111111111111111111111111111112': { symbol: 'SOL', decimals: 9 },
   'Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B': { symbol: 'bbSOL', decimals: 9 },
+  // Liquid staking
+  '7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj': { symbol: 'stSOL', decimals: 9 },
+  'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn': { symbol: 'JitoSOL', decimals: 9 },
+  'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': { symbol: 'mSOL', decimals: 9 },
+  // Bridged assets
+  '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs': { symbol: 'WETH', decimals: 8 },
+  '3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh': { symbol: 'WBTC', decimals: 8 },
+  // Popular SPL tokens
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': { symbol: 'BONK', decimals: 5 },
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': { symbol: 'JUP', decimals: 6 },
+  'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3': { symbol: 'PYTH', decimals: 6 },
+  'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL': { symbol: 'JTO', decimals: 9 },
+  'WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk': { symbol: 'WEN', decimals: 5 },
+  'rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof': { symbol: 'RENDER', decimals: 8 },
+  'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm': { symbol: 'WIF', decimals: 6 },
+  'TNSRxcUxoT9xBG3de7PiJyTDYu7kskLqcpddxnEJAS6': { symbol: 'TNSR', decimals: 9 },
+  '4SoQ8UkWfeDH47T56PA53CZCeW4KytYCiU65CwBWoJUt': { symbol: 'MNT', decimals: 9 },
+  'AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P': { symbol: 'XAUt0', decimals: 6 },
+  'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB': { symbol: 'xTSLA', decimals: 8 },
+  'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh': { symbol: 'xNVDA', decimals: 8 },
 };
+
+/**
+ * Resolve a token symbol (case-insensitive) or mint address to a mint address.
+ * Returns undefined if not found.
+ */
+export function resolveToken(symbolOrMint: string): string | undefined {
+  // Try direct mint lookup first
+  if (KNOWN_TOKENS[symbolOrMint]) return symbolOrMint;
+  // Try symbol lookup (case-insensitive)
+  const upper = symbolOrMint.toUpperCase();
+  for (const [mint, info] of Object.entries(KNOWN_TOKENS)) {
+    if (info.symbol.toUpperCase() === upper) return mint;
+  }
+  return undefined;
+}
+
+/**
+ * Returns decimals for a known mint, defaulting to 9 if unknown.
+ */
+export function resolveDecimals(mint: string): number {
+  return KNOWN_TOKENS[mint]?.decimals ?? 9;
+}
 
 const RPC_ENDPOINT = process.env.SOL_RPC || process.env.SOL_ENDPOINT || 'https://api.mainnet-beta.solana.com';
 
