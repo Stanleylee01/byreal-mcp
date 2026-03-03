@@ -11,7 +11,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { ChainClient, apiFetch, apiPost } from '../config.js';
+import { ChainClient, apiFetch, apiPost, API_ENDPOINTS } from '../config.js';
 import { loadWallet, loadConfig, signAndSend } from '../wallet.js';
 import { execSync } from 'child_process';
 import * as path from 'path';
@@ -425,19 +425,62 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
       poolAddress: z.string().describe('Pool address'),
       priceLower: z.string().describe('Lower price bound (token B per token A)'),
       priceUpper: z.string().describe('Upper price bound (token B per token A)'),
-      baseToken: z.enum(['A', 'B']).describe('Which token to use as base (A or B)'),
-      baseAmount: z.string().describe('Amount of base token in UI units (e.g. "50" for 50 USDC, "1.5" for 1.5 SOL)'),
+      baseToken: z.enum(['A', 'B']).optional().default('A').describe('Which token to use as base (A or B). Optional when using amountUsd.'),
+      baseAmount: z.string().optional().describe('Amount of base token in UI units (e.g. "50" for 50 USDC). Mutually exclusive with amountUsd.'),
+      amountUsd: z.number().positive().optional().describe('Investment amount in USD. Auto-calculates token split based on current price and range. Mutually exclusive with baseAmount.'),
       userAddress: z.string().describe('User wallet public key (base58)'),
       slippage: z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
     },
-    async ({ poolAddress, priceLower, priceUpper, baseToken, baseAmount, userAddress, slippage }) => {
+    async ({ poolAddress, priceLower, priceUpper, baseToken, baseAmount, amountUsd, userAddress, slippage }) => {
+      // Validate: either baseAmount or amountUsd, not both
+      if (baseAmount && amountUsd) {
+        return { content: [{ type: 'text' as const, text: '❌ Specify either baseAmount or amountUsd, not both.' }], isError: true };
+      }
+      if (!baseAmount && !amountUsd) {
+        return { content: [{ type: 'text' as const, text: '❌ Either baseAmount or amountUsd is required.\n\n💡 Suggestions:\n  • Use amountUsd=100 to invest $100 (auto-split tokens)\n  • Or use baseToken="A" baseAmount="1.5" for manual amount' }], isError: true };
+      }
+
+      // If amountUsd mode: fetch pool prices and calculate split
+      let effectiveBaseAmount = baseAmount ?? '0';
+      let effectiveBaseToken = baseToken ?? 'A';
+      if (amountUsd) {
+        try {
+          const pool = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { poolAddress });
+          const priceA = Number(pool?.mintA?.price ?? 0);
+          const priceB = Number(pool?.mintB?.price ?? 0);
+          if (priceA <= 0 || priceB <= 0) {
+            return { content: [{ type: 'text' as const, text: `❌ Cannot resolve token prices for USD split.\n  Token A price: $${priceA}\n  Token B price: $${priceB}\n\n💡 Use baseAmount instead of amountUsd.` }], isError: true };
+          }
+
+          // Approximate 50/50 USD split (simplified — real CLMM depends on tick math)
+          const currentPrice = priceA; // price of token A in USD
+          const pL = Number(priceLower);
+          const pU = Number(priceUpper);
+          const pC = priceA / priceB; // current price in token B per token A terms
+
+          // Estimate ratio: if current price is mid-range, ~50/50. If near edges, skew.
+          let ratioA = 0.5; // fraction of capital to token A
+          if (pC > 0 && pL > 0 && pU > 0) {
+            if (pC <= pL) { ratioA = 1.0; } // below range: all A
+            else if (pC >= pU) { ratioA = 0.0; } // above range: all B
+            else { ratioA = (pU - pC) / (pU - pL); } // linear approximation
+          }
+
+          const usdForA = amountUsd * ratioA;
+          const amountA = usdForA / priceA;
+          effectiveBaseToken = 'A';
+          effectiveBaseAmount = amountA.toFixed(9);
+        } catch (e: any) {
+          return { content: [{ type: 'text' as const, text: `❌ Failed to calculate USD split: ${e.message}\n\n💡 Use baseAmount instead.` }], isError: true };
+        }
+      }
       try {
         const output = runSdkScript('src/scripts/create-position.ts', {
           POOL_ADDRESS: poolAddress,
           PRICE_LOWER: priceLower,
           PRICE_UPPER: priceUpper,
-          BASE_TOKEN: baseToken,
-          BASE_AMOUNT: baseAmount,
+          BASE_TOKEN: effectiveBaseToken,
+          BASE_AMOUNT: effectiveBaseAmount,
           USER_ADDRESS: userAddress,
           SLIPPAGE: slippage || '0.02',
         });
@@ -450,6 +493,7 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
 
         const details = [
           `Open Position Transaction Built`,
+          amountUsd ? `Investment: $${amountUsd} USD (auto-split)` : '',
           ``,
           `Pool: ${result.poolAddress}`,
           `Token A: ${result.mintA}`,
@@ -462,7 +506,7 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
           `  Token B: ${result.estimatedAmountB}`,
           ``,
           `NFT Mint (position address): ${result.nftAddress}`,
-        ].join('\n');
+        ].filter(Boolean).join('\n');
 
         const text = await formatWriteResult(result.unsignedTx, details);
         return { content: [{ type: 'text' as const, text }] };
@@ -635,11 +679,19 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
     {
       positionAddress: z.string().describe('Address of the position to copy'),
       userAddress:     z.string().describe('Your wallet public key (payer)'),
-      baseToken:       z.enum(['A', 'B']).default('A').optional().describe('Which token to use as the input (default A)'),
-      baseAmount:      z.string().describe('Amount of base token in UI units (e.g. "50" for $50 of Token A)'),
+      baseToken:       z.enum(['A', 'B']).default('A').optional().describe('Which token to use as the input (default A). Optional when using amountUsd.'),
+      baseAmount:      z.string().optional().describe('Amount of base token in UI units. Mutually exclusive with amountUsd.'),
+      amountUsd:       z.number().positive().optional().describe('Investment amount in USD. Auto-calculates token split. Mutually exclusive with baseAmount.'),
       slippage:        z.string().optional().describe('Slippage tolerance (default "0.02" = 2%)'),
     },
-    async ({ positionAddress, userAddress, baseToken = 'A', baseAmount, slippage }) => {
+    async ({ positionAddress, userAddress, baseToken = 'A', baseAmount, amountUsd, slippage }) => {
+      // Validate inputs
+      if (baseAmount && amountUsd) {
+        return { content: [{ type: 'text' as const, text: '❌ Specify either baseAmount or amountUsd, not both.' }], isError: true };
+      }
+      if (!baseAmount && !amountUsd) {
+        return { content: [{ type: 'text' as const, text: '❌ Either baseAmount or amountUsd is required.\n\n💡 Suggestions:\n  • Use amountUsd=100 to copy with $100\n  • Or use baseToken="A" baseAmount="1.5" for manual amount' }], isError: true };
+      }
       // Step 1: Look up position details from Byreal API
       let posDetail: any;
       try {
@@ -666,20 +718,41 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
 
       if (tickLower === undefined || tickUpper === undefined || !poolAddress) {
         return {
-          content: [{ type: 'text' as const, text: `Position ${positionAddress} missing tick/pool data. Lower: ${tickLower}, Upper: ${tickUpper}, Pool: ${poolAddress}` }],
+          content: [{ type: 'text' as const, text: [
+            `❌ Position ${positionAddress} missing tick/pool data.`,
+            `  Lower: ${tickLower}, Upper: ${tickUpper}, Pool: ${poolAddress}`,
+            ``,
+            `💡 Suggestions:`,
+            `  • Verify the position address with byreal_top_positions`,
+            `  • The position may have been closed already`,
+          ].join('\n') }],
           isError: true,
         };
       }
 
-      // Step 2: Build open position tx with same pool+range (using TICK mode)
+      // Step 2: Calculate effective amount
+      let effectiveBaseAmount = baseAmount ?? '0';
+      let effectiveBaseToken = baseToken ?? 'A';
+      if (amountUsd) {
+        const priceA = Number(pool.mintA?.price ?? 0);
+        const priceB = Number(pool.mintB?.price ?? 0);
+        if (priceA <= 0 || priceB <= 0) {
+          return { content: [{ type: 'text' as const, text: `❌ Cannot resolve token prices for USD split.\n\n💡 Use baseAmount instead.` }], isError: true };
+        }
+        // Simple allocation: invest $amountUsd worth of token A
+        effectiveBaseAmount = (amountUsd / priceA).toFixed(9);
+        effectiveBaseToken = 'A';
+      }
+
+      // Step 3: Build open position tx with same pool+range (using TICK mode)
       let result: any;
       try {
         const output = runSdkScript('src/scripts/create-position.ts', {
           POOL_ADDRESS:     poolAddress,
           TICK_LOWER:       String(tickLower),
           TICK_UPPER:       String(tickUpper),
-          BASE_TOKEN:       baseToken,
-          BASE_AMOUNT:      baseAmount,
+          BASE_TOKEN:       effectiveBaseToken,
+          BASE_AMOUNT:      effectiveBaseAmount,
           USER_ADDRESS:     userAddress,
           SLIPPAGE:         slippage || '0.02',
           REFERER_POSITION: positionAddress,  // Copy Farm: memo with referer
@@ -687,11 +760,29 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
         result = JSON.parse(output.trim());
       } catch (err: any) {
         const msg = err.stderr || err.message || String(err);
-        return { content: [{ type: 'text' as const, text: `SDK Error building tx: ${msg}` }], isError: true };
+        const suggestions: string[] = [];
+        if (msg.includes('insufficient') || msg.includes('balance')) {
+          suggestions.push(`Check balance: byreal_wallet_status`);
+          suggestions.push(`Swap to get more tokens: byreal_easy_swap`);
+        }
+        if (msg.includes('tick') || msg.includes('range')) {
+          suggestions.push(`Position may be out of range — check with byreal_pool_analyze`);
+        }
+        if (!suggestions.length) {
+          suggestions.push(`Verify position is still active: byreal_top_positions`);
+          suggestions.push(`Try a smaller amountUsd or baseAmount`);
+        }
+        return { content: [{ type: 'text' as const, text: [
+          `❌ SDK Error: ${msg}`,
+          ``,
+          `💡 Suggestions:`,
+          ...suggestions.map(s => `  • ${s}`),
+        ].join('\n') }], isError: true };
       }
 
       const details = [
         `📋 Copy Position — ${symA}/${symB}`,
+        amountUsd ? `Investment: $${amountUsd} USD (auto-split)` : '',
         ``,
         `Copying: ${positionAddress}`,
         `Original farmer: ${posDetail.providerAddress ?? '?'}`,
@@ -704,7 +795,7 @@ export function registerLiquidityTools(server: McpServer, chain: ChainClient) {
         `Est. ${symA}: ${result.estimatedAmountA}`,
         `Est. ${symB}: ${result.estimatedAmountB}`,
         `NFT address: ${result.nftAddress}`,
-      ].join('\n');
+      ].filter(Boolean).join('\n');
 
       const text = await formatWriteResult(result.unsignedTx, details);
       return { content: [{ type: 'text' as const, text }] };

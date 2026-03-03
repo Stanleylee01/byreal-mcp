@@ -159,8 +159,10 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
       amount: z.string().describe('Human-readable input amount (e.g. "1.5" for 1.5 SOL)'),
       slippageBps: z.number().min(1).max(5000).default(50)
         .describe('Slippage tolerance in basis points (50 = 0.5%)'),
+      dryRun: z.boolean().default(false)
+        .describe('If true, return quote only without executing the swap'),
     },
-    async ({ fromToken, toToken, amount, slippageBps }) => {
+    async ({ fromToken, toToken, amount, slippageBps, dryRun }) => {
       // Resolve symbols to mint addresses
       const inputMint = resolveToken(fromToken) ?? fromToken;
       const outputMint = resolveToken(toToken) ?? toToken;
@@ -217,7 +219,22 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
       ];
       if (quoteData.routerType) quoteLines.push(`Router: ${quoteData.routerType}`);
 
-      // Step 2: Try to execute if wallet is available
+      // Step 2: Dry-run mode — return quote only
+      if (dryRun) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: [
+              ...quoteLines,
+              ``,
+              `🔍 Dry-run mode — no transaction executed.`,
+              `To execute: call again with dryRun=false`,
+            ].join('\n'),
+          }],
+        };
+      }
+
+      // Step 3: Try to execute if wallet is available
       const config = loadConfig();
       const wallet = loadWallet();
       if (!config || !wallet) {
@@ -227,7 +244,11 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
             text: [
               ...quoteLines,
               ``,
-              `⚠️ No wallet configured — quote only. Run byreal_wallet_setup to enable auto-execution.`,
+              `⚠️ No wallet configured — quote only.`,
+              ``,
+              `💡 Suggestions:`,
+              `  1. Run byreal_wallet_setup to create a wallet`,
+              `  2. Or use byreal_swap_quote + byreal_sign_and_send for manual flow`,
             ].join('\n'),
           }],
         };
@@ -249,7 +270,16 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
         return {
           content: [{
             type: 'text' as const,
-            text: [...quoteLines, ``, `❌ Transaction build failed: ${err.message}`].join('\n'),
+            text: [
+              ...quoteLines,
+              ``,
+              `❌ Transaction build failed: ${err.message}`,
+              ``,
+              `💡 Suggestions:`,
+              `  1. Check wallet SOL balance with byreal_wallet_status`,
+              `  2. Try a smaller amount`,
+              `  3. Try byreal_swap_quote to check if the route exists`,
+            ].join('\n'),
           }],
           isError: true,
         };
@@ -259,7 +289,16 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
         return {
           content: [{
             type: 'text' as const,
-            text: [...quoteLines, ``, `❌ Router returned no transaction. Route may be unavailable.`].join('\n'),
+            text: [
+              ...quoteLines,
+              ``,
+              `❌ Router returned no transaction. Route may be unavailable.`,
+              ``,
+              `💡 Suggestions:`,
+              `  1. Try a different token pair`,
+              `  2. Check byreal_list_pools for available liquidity pools`,
+              `  3. Use byreal_swap_quote to verify the route first`,
+            ].join('\n'),
           }],
           isError: true,
         };
@@ -280,13 +319,35 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
           }],
         };
       } catch (err: any) {
+        const errMsg = err.message || String(err);
+        const suggestions: string[] = [];
+
+        if (errMsg.includes('insufficient') || errMsg.includes('0x1')) {
+          suggestions.push(`Check balance: byreal_wallet_status`);
+          suggestions.push(`You may need more SOL for gas. Send SOL to your wallet address.`);
+        }
+        if (errMsg.includes('Blockhash') || errMsg.includes('expired')) {
+          suggestions.push(`Network congestion — try again in a few seconds`);
+        }
+        if (errMsg.includes('slippage') || errMsg.includes('0x1771')) {
+          suggestions.push(`Increase slippage: try slippageBps=200 (2%)`);
+        }
+        if (!suggestions.length) {
+          suggestions.push(`Try again — transient RPC errors are common`);
+          suggestions.push(`Check byreal_wallet_status to verify your balance`);
+        }
+
         return {
           content: [{
             type: 'text' as const,
             text: [
               ...quoteLines,
               ``,
-              `❌ Execution failed: ${err.message}`,
+              `❌ Execution failed: ${errMsg}`,
+              ``,
+              `💡 Suggestions:`,
+              ...suggestions.map(s => `  • ${s}`),
+              ``,
               `Transaction (base64) for manual signing:`,
               txData.transaction,
             ].join('\n'),

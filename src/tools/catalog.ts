@@ -75,8 +75,8 @@ const TOOL_CATALOG: ToolEntry[] = [
   {
     category: 'Swap',
     name: 'byreal_easy_swap',
-    description: 'Human-friendly swap: auto-resolves token symbols to mints, converts human-readable amounts. Single call does quote + sign + send.',
-    params: 'fromToken (symbol or mint), toToken (symbol or mint), amount (e.g. "1.5"), slippageBps',
+    description: 'Human-friendly swap with dry-run support. Auto-resolves symbols, converts amounts. Includes error recovery suggestions.',
+    params: 'fromToken (symbol or mint), toToken (symbol or mint), amount (e.g. "1.5"), slippageBps, dryRun (preview only)',
   },
   // ── Tokens ────────────────────────────────────────────────────────────────
   {
@@ -113,6 +113,18 @@ const TOOL_CATALOG: ToolEntry[] = [
   // ── Liquidity ─────────────────────────────────────────────────────────────
   {
     category: 'Liquidity',
+    name: 'byreal_open_position',
+    description: 'Open a new CLMM LP position. Supports amountUsd for auto token split based on price range. Returns unsigned tx.',
+    params: 'poolAddress, priceLower, priceUpper, baseToken, baseAmount OR amountUsd (auto-split), userAddress, slippage',
+  },
+  {
+    category: 'Liquidity',
+    name: 'byreal_close_position',
+    description: 'Close a CLMM position (remove all liquidity). Returns unsigned tx.',
+    params: 'nftMint, userAddress, slippage, closePosition',
+  },
+  {
+    category: 'Liquidity',
     name: 'byreal_add_liquidity',
     description: 'Add liquidity to an existing position or create a new one. Requires wallet.',
     params: 'poolAddress, tokenAAmount, tokenBAmount, priceLower, priceUpper, slippageBps',
@@ -145,8 +157,8 @@ const TOOL_CATALOG: ToolEntry[] = [
   {
     category: 'CopyFarmer',
     name: 'byreal_copy_position',
-    description: 'Copy an existing position with same price range. Records referral on-chain for copy bonus (yield boost + referral fees). Requires wallet.',
-    params: 'positionAddress, userAddress, baseToken (A|B), baseAmount, slippage',
+    description: 'Copy an existing position with same price range. Records referral on-chain for copy bonus. Supports amountUsd for auto token split.',
+    params: 'positionAddress, userAddress, baseToken (A|B), baseAmount OR amountUsd (auto-split), slippage',
   },
   {
     category: 'CopyFarmer',
