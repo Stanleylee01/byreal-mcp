@@ -54,7 +54,23 @@ export function loadConfig(): WalletConfig {
 export function loadWallet(): WalletInfo | null {
   try {
     if (fs.existsSync(WALLET_FILE)) {
-      return JSON.parse(fs.readFileSync(WALLET_FILE, 'utf-8'));
+      const data = JSON.parse(fs.readFileSync(WALLET_FILE, 'utf-8'));
+
+      // Native format: { publicKey, secretKey, createdAt }
+      if (data.publicKey && data.secretKey) {
+        return data;
+      }
+
+      // Keypair path format: { keypairPath: "/path/to/id.json" }
+      if (data.keypairPath && fs.existsSync(data.keypairPath)) {
+        const skBytes: number[] = JSON.parse(fs.readFileSync(data.keypairPath, 'utf-8'));
+        const kp = Keypair.fromSecretKey(Uint8Array.from(skBytes));
+        return {
+          publicKey: kp.publicKey.toBase58(),
+          secretKey: Array.from(kp.secretKey),
+          createdAt: new Date().toISOString(),
+        };
+      }
     }
   } catch {}
   return null;
@@ -109,15 +125,20 @@ export async function signAndSend(unsignedTxB64: string): Promise<{ signature: s
 
   const keypair = Keypair.fromSecretKey(Uint8Array.from(walletInfo.secretKey));
 
-  // Deserialize and sign
+  // Deserialize, refresh blockhash, and sign
   const txBuf = Buffer.from(unsignedTxB64, 'base64');
   const tx = VersionedTransaction.deserialize(txBuf);
+
+  // Replace blockhash with a fresh one to avoid "Blockhash not found" errors
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  tx.message.recentBlockhash = blockhash;
+
   tx.sign([keypair]);
 
-  // Broadcast
+  // Broadcast with skipPreflight to avoid simulation failures on stale blockhash
   const signature = await connection.sendRawTransaction(tx.serialize(), {
-    skipPreflight: false,
-    maxRetries: 3,
+    skipPreflight: true,
+    maxRetries: 5,
   });
 
   // Poll for confirmation (2s interval, 60s timeout)
