@@ -156,17 +156,19 @@ export function registerPositionTools(server: McpServer, chain: ChainClient) {
         };
       }
 
-      // 2. Pool detail
-      const poolDetail = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { id: posItem.poolAddress });
-      const pool = poolDetail?.pool ?? poolDetail;
+      // 2. Pool detail — API returns: tvl, volumeUsd24h, feeApr24h, mintA.mintInfo.symbol, mintA.price
+      let pool: any = {};
+      try {
+        pool = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { poolAddress: posItem.poolAddress });
+      } catch { /* pool detail is non-critical enrichment */ }
 
-      const currentPrice = pool?.current_price ?? 0;
-      const symbolA = posItem.tokenSymbolA ?? pool?.token_a?.symbol ?? 'TokenA';
-      const symbolB = posItem.tokenSymbolB ?? pool?.token_b?.symbol ?? 'TokenB';
-      const tvlUsd = pool?.tvl_usd ?? 0;
-      const vol24h = pool?.volume_24h_usd ?? 0;
-      const apr = pool?.apr ?? 0;
-      const priceChange24h = pool?.price_change_24h ?? 0;
+      const currentPrice = Number(pool?.mintA?.price ?? pool?.current_price ?? 0);
+      const symbolA = posItem.tokenSymbolA ?? pool?.mintA?.mintInfo?.symbol ?? pool?.token_a?.symbol ?? 'TokenA';
+      const symbolB = posItem.tokenSymbolB ?? pool?.mintB?.mintInfo?.symbol ?? pool?.token_b?.symbol ?? 'TokenB';
+      const tvlUsd = Number(pool?.tvl ?? pool?.tvl_usd ?? 0);
+      const vol24h = Number(pool?.volumeUsd24h ?? pool?.volume_24h_usd ?? 0);
+      const apr = Number(pool?.feeApr24h ?? pool?.apr ?? 0);
+      const priceChange24h = Number(pool?.price_change_24h ?? 0);
 
       // 3. Performance from API
       const liquidityUsd = parseFloat(posItem.liquidityUsd || posItem.totalDeposit || '0');

@@ -71,17 +71,27 @@ export function registerPoolTools(server: McpServer, chain: ChainClient) {
       poolIds: z.array(z.string()).min(1).max(10).describe('Pool addresses (base58)'),
     },
     async ({ poolIds }) => {
-      // POOLS_BY_IDS is a POST endpoint — GET returns empty
-      const data = await apiPost<V2PoolResp>(API_ENDPOINTS.POOLS_BY_IDS, {
-        ids: poolIds,
-      });
+      // Fetch each pool via details endpoint (ids endpoint deprecated)
+      const results: string[] = [];
+      for (const pid of poolIds) {
+        try {
+          const pool = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { poolAddress: pid });
+          if (pool) {
+            results.push(fmtPool(pool));
+          } else {
+            results.push(`Pool ${pid}: not found`);
+          }
+        } catch (e: any) {
+          results.push(`Pool ${pid}: ${e.message}`);
+        }
+      }
 
-      if (!data?.records?.length) {
-        return { content: [{ type: 'text' as const, text: 'Pools not found.' }], isError: true };
+      if (!results.length) {
+        return { content: [{ type: 'text' as const, text: 'No pools found.' }], isError: true };
       }
 
       return {
-        content: [{ type: 'text' as const, text: data.records.map(fmtPool).join('\n\n---\n\n') }],
+        content: [{ type: 'text' as const, text: results.join('\n\n---\n\n') }],
       };
     }
   );
@@ -138,37 +148,34 @@ export function registerPoolTools(server: McpServer, chain: ChainClient) {
       if (!rangePercents.length) throw new Error('No valid range percents provided');
 
       // 1. Pool detail (v2 details endpoint)
-      const detailResp = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { id: poolAddress });
+      const detailResp = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { poolAddress });
       // Pool detail may be nested differently — handle both shapes
       const pool = detailResp?.pool ?? detailResp;
 
       if (!pool?.poolAddress && !pool?.tvl_usd && !detailResp?.poolAddress) {
-        // Fall back to POOLS_BY_IDS
-        const fallback = await apiPost<{ records: any[] }>(API_ENDPOINTS.POOLS_BY_IDS, { ids: [poolAddress] });
-        if (!fallback?.records?.length) {
-          return { content: [{ type: 'text' as const, text: `Pool ${poolAddress} not found` }], isError: true };
-        }
-        // Use simple pool data
-        const p = fallback.records[0];
-        return { content: [{ type: 'text' as const, text: `Pool found but detailed analysis requires v2 details endpoint.\n\n${fmtPool(p)}` }] };
+        return { content: [{ type: 'text' as const, text: `Pool ${poolAddress} not found or no data returned from details API.` }], isError: true };
       }
 
-      // Normalise field names (v2 detail uses snake_case)
-      const tvl = pool.tvl_usd ?? pool.tvl ?? 0;
-      const vol24h = pool.volume_24h_usd ?? pool.volumeUsd24h ?? 0;
-      const feeRateBps = pool.fee_rate_bps ?? (pool.feeRate?.fixFeeRate ? Number(pool.feeRate.fixFeeRate) / 1e4 : 0);
-      const feeRate = feeRateBps / 10000;
-      const currentPrice = pool.current_price ?? pool.price ?? 0;
-      const dayLow = pool.price_range_24h?.low ?? currentPrice * 0.97;
-      const dayHigh = pool.price_range_24h?.high ?? currentPrice * 1.03;
+      // Normalise field names — API returns: tvl, volumeUsd24h, feeRate.fixFeeRate, mintA.price, mintA.mintInfo.symbol, dayPriceRange
+      const tvl = Number(pool.tvl ?? pool.tvl_usd ?? 0);
+      const vol24h = Number(pool.volumeUsd24h ?? pool.volume_24h_usd ?? 0);
+      // feeRate.fixFeeRate is in 1/1,000,000 units (e.g. 2000 = 0.2%)
+      const feeRateRaw = pool.feeRate?.fixFeeRate ? Number(pool.feeRate.fixFeeRate) : (pool.fee_rate_bps ?? 0);
+      const feeRate = feeRateRaw / 1_000_000;
+      // Price: use mintA.price (price of token A in token B terms, or USD)
+      const currentPrice = Number(pool.mintA?.price ?? pool.current_price ?? pool.price ?? 0);
+      // Day price range from dayPriceRange field
+      const dayPriceRange = pool.dayPriceRange ?? pool.price_range_24h ?? {};
+      const dayLow = Number(dayPriceRange.low ?? dayPriceRange.min ?? (currentPrice > 0 ? currentPrice * 0.97 : 0));
+      const dayHigh = Number(dayPriceRange.high ?? dayPriceRange.max ?? (currentPrice > 0 ? currentPrice * 1.03 : 0));
       const dayRangePercent = currentPrice > 0 ? ((dayHigh - dayLow) / currentPrice) * 100 : 0;
-      const priceChange24h = pool.price_change_24h ?? 0;
-      const symA = pool.token_a?.symbol ?? pool.mintA?.symbol ?? '?';
-      const symB = pool.token_b?.symbol ?? pool.mintB?.symbol ?? '?';
+      const priceChange24h = Number(pool.price_change_24h ?? 0);
+      const symA = pool.mintA?.mintInfo?.symbol ?? pool.mintA?.symbol ?? pool.token_a?.symbol ?? '?';
+      const symB = pool.mintB?.mintInfo?.symbol ?? pool.mintB?.symbol ?? pool.token_b?.symbol ?? '?';
 
-      // 2. Fee APR helpers
+      // 2. Fee APR — prefer API-provided feeApr24h, fall back to manual calculation
       const fee24h = vol24h * feeRate;
-      const poolFeeApr = tvl > 0 ? (fee24h / tvl) * 365 * 100 : 0;
+      const poolFeeApr = pool.feeApr24h ? Number(pool.feeApr24h) : (tvl > 0 ? (fee24h / tvl) * 365 * 100 : 0);
 
       // 3. Assess risk helpers
       function tvlRisk(t: number) { return t > 1_000_000 ? 'low' : t >= 100_000 ? 'medium' : 'high'; }
