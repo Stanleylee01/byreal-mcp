@@ -79,10 +79,28 @@ export function resolveDecimals(mint: string): number {
   return KNOWN_TOKENS[mint]?.decimals ?? 9;
 }
 
-const RPC_ENDPOINT = process.env.SOL_RPC || process.env.SOL_ENDPOINT || 'https://api.mainnet-beta.solana.com';
+function getRpcEndpoint(): string {
+  // Priority: env var > ~/.byreal-mcp/config.json > public RPC
+  if (process.env.SOL_RPC || process.env.SOL_ENDPOINT) {
+    return process.env.SOL_RPC || process.env.SOL_ENDPOINT!;
+  }
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+    const cfgFile = path.join(os.homedir(), '.byreal-mcp', 'config.json');
+    if (fs.existsSync(cfgFile)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
+      if (cfg.rpcUrl) return cfg.rpcUrl;
+      // Support heliusApiKey shorthand
+      if (cfg.heliusApiKey) return `https://mainnet.helius-rpc.com/?api-key=${cfg.heliusApiKey}`;
+    }
+  } catch {}
+  return 'https://api.mainnet-beta.solana.com';
+}
 
 export function getConnection(): Connection {
-  return new Connection(RPC_ENDPOINT);
+  return new Connection(getRpcEndpoint());
 }
 
 export function createChain() {

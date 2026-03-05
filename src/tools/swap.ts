@@ -128,7 +128,23 @@ export function registerSwapTools(server: McpServer, chain: ChainClient) {
               ].join('\n'),
             }],
           };
-        } catch {}
+        } catch (signErr: any) {
+          // Auto-sign failed — fall through to return unsigned tx with error note
+          console.error('[byreal-mcp] Auto-sign failed:', signErr?.message);
+          return {
+            content: [{
+              type: 'text' as const,
+              text: [
+                `⚠️ Auto-sign failed: ${signErr?.message ?? 'unknown error'}`,
+                ``,
+                `Transaction (base64) — sign manually:`,
+                data.transaction,
+                `Explorer (after manual sign): https://solscan.io`,
+              ].join('\n'),
+            }],
+            isError: true,
+          };
+        }
       }
 
       return {

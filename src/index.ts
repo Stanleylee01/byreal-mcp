@@ -23,7 +23,7 @@ import { createChain } from './config.js';
 
 const server = new McpServer({
   name: 'byreal-mcp',
-  version: '0.6.1',
+  version: '0.6.3',
 });
 
 const chain = createChain();
@@ -43,7 +43,7 @@ registerCatalogTools(server, chain);
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[byreal-mcp] Server v0.6.0 started on stdio');
+  console.error('[byreal-mcp] Server v0.6.3 started on stdio');
 }
 
 main().catch((err) => {

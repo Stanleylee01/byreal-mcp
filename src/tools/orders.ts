@@ -14,18 +14,18 @@ export function registerOrderTools(server: McpServer, chain: ChainClient) {
     'byreal_order_history',
     'Get swap/trade order history for a wallet on Byreal.',
     {
-      userAddress: z.string().describe('Wallet public key'),
+      walletAddress: z.string().describe('Wallet public key (base58)'),
       page: z.number().min(1).default(1),
       pageSize: z.number().min(1).max(50).default(10),
     },
-    async ({ userAddress, page, pageSize }) => {
+    async ({ walletAddress, page, pageSize }) => {
       const data = await apiFetch<any>(`${API_BASE}/dex/v2/order/list`, {
-        userAddress, page: String(page), pageSize: String(pageSize),
+        userAddress: walletAddress, page: String(page), pageSize: String(pageSize),
       });
 
       const records = data?.records ?? data?.list ?? [];
       if (!records.length) {
-        return { content: [{ type: 'text' as const, text: `No orders found for ${userAddress}` }] };
+        return { content: [{ type: 'text' as const, text: `No orders found for ${walletAddress}` }] };
       }
 
       const lines = records.map((o: any, i: number) => {
@@ -41,7 +41,7 @@ export function registerOrderTools(server: McpServer, chain: ChainClient) {
       return {
         content: [{
           type: 'text' as const,
-          text: `Orders for ${userAddress} (${data.total ?? records.length}):\n\n${lines.join('\n\n')}`,
+          text: `Orders for ${walletAddress} (${data.total ?? records.length}):\n\n${lines.join('\n\n')}`,
         }],
       };
     }
@@ -86,16 +86,16 @@ export function registerOrderTools(server: McpServer, chain: ChainClient) {
     'byreal_position_overview',
     'Get position overview summary for a wallet — total count and aggregated stats.',
     {
-      userAddress: z.string().describe('Wallet public key'),
+      walletAddress: z.string().describe('Wallet public key (base58)'),
     },
-    async ({ userAddress }) => {
-      const data = await apiFetch<any>(`${API_BASE}/dex/v2/position/overview`, { userAddress });
+    async ({ walletAddress }) => {
+      const data = await apiFetch<any>(`${API_BASE}/dex/v2/position/overview`, { userAddress: walletAddress });
 
       return {
         content: [{
           type: 'text' as const,
           text: [
-            `Position Overview for ${userAddress}:`,
+            `Position Overview for ${walletAddress}:`,
             ...Object.entries(data ?? {}).map(([k, v]) => `  ${k}: ${v}`),
           ].join('\n'),
         }],

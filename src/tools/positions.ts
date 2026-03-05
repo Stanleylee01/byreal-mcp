@@ -42,7 +42,7 @@ export function registerPositionTools(server: McpServer, chain: ChainClient) {
         const pool = data.poolMap?.[p.poolAddress];
         const symA = pool?.mintA?.symbol ?? '?';
         const symB = pool?.mintB?.symbol ?? '?';
-        const statusLabel = p.status === 0 ? '🟢 Active' : p.status === 1 ? '🔴 Out of range' : `Status ${p.status}`;
+        const statusLabel = p.status === 0 ? '🟢 Active' : p.status === 1 ? '🔴 Out of range' : p.status === 2 ? '⚫ Closed' : `Status ${p.status}`;
         const ageDays = p.positionAgeMs ? (p.positionAgeMs / 86400000).toFixed(1) : '?';
 
         return [
@@ -88,17 +88,12 @@ export function registerPositionTools(server: McpServer, chain: ChainClient) {
       depositUsd: z.number().positive().describe('Deposit amount in USD'),
     },
     async ({ poolAddress, depositUsd }) => {
-      // Fetch pool info via v2 API
-      // POOLS_BY_IDS is a POST endpoint
-      const data = await apiPost<{ records: any[] }>(API_ENDPOINTS.POOLS_BY_IDS, {
-        ids: [poolAddress],
-      });
+      // Fetch pool info via pool details GET endpoint
+      const pool = await apiFetch<any>(API_ENDPOINTS.POOL_DETAILS, { poolAddress });
 
-      if (!data?.records?.length) {
+      if (!pool) {
         return { content: [{ type: 'text' as const, text: `Pool ${poolAddress} not found` }], isError: true };
       }
-
-      const pool = data.records[0];
       const symA = pool.mintA?.mintInfo?.symbol ?? '?';
       const symB = pool.mintB?.mintInfo?.symbol ?? '?';
       const tvl = Number(pool.tvl || 0);

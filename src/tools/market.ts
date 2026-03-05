@@ -21,9 +21,9 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
           type: 'text' as const,
           text: [
             '📊 Byreal Global Overview',
-            `TVL: $${Number(data.tvl).toLocaleString(undefined, {maximumFractionDigits: 0})} (${(Number(data.tvlChange) * 100).toFixed(2)}%)`,
-            `Volume 24h: $${Number(data.volumeUsd24h).toLocaleString(undefined, {maximumFractionDigits: 0})} (${(Number(data.volumeUsd24hChange) * 100).toFixed(2)}%)`,
-            `Fees 24h: $${Number(data.feeUsd24h).toLocaleString(undefined, {maximumFractionDigits: 0})} (${(Number(data.feeUsd24hChange) * 100).toFixed(2)}%)`,
+            `TVL: $${Number(data.tvl).toLocaleString(undefined, {maximumFractionDigits: 0})} (${Number(data.tvlChange).toFixed(2)}%)`,
+            `Volume 24h: $${Number(data.volumeUsd24h).toLocaleString(undefined, {maximumFractionDigits: 0})} (${Number(data.volumeUsd24hChange).toFixed(2)}%)`,
+            `Fees 24h: $${Number(data.feeUsd24h).toLocaleString(undefined, {maximumFractionDigits: 0})} (${Number(data.feeUsd24hChange).toFixed(2)}%)`,
             `All-time Volume: $${Number(data.volumeAll).toLocaleString(undefined, {maximumFractionDigits: 0})}`,
             `All-time Fees: $${Number(data.feeAll).toLocaleString(undefined, {maximumFractionDigits: 0})}`,
           ].join('\n'),
@@ -36,9 +36,10 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
     'byreal_mint_prices',
     'Get current USD prices for one or more tokens by mint address. Fast batch price lookup.',
     {
-      mints: z.array(z.string()).min(1).max(20).describe('Token mint addresses'),
+      mints: z.union([z.string(), z.array(z.string())]).describe('Token mint address(es) — single string or array of up to 20'),
     },
-    async ({ mints }) => {
+    async ({ mints: rawMints }) => {
+      const mints = Array.isArray(rawMints) ? rawMints : [rawMints];
       const data = await apiFetch<Record<string, string>>(
         `${API_BASE}/dex/v2/mint/price`,
         { mints: mints.join(',') }
@@ -93,10 +94,12 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
     'byreal_hot_tokens',
     'Get trending/hot tokens on Byreal.',
     {
-      type: z.number().default(1).describe('Hot token type (1 = trending)'),
+      type: z.number().optional().describe('Hot token type (omit for default trending list)'),
     },
     async ({ type }) => {
-      const data = await apiFetch<any>(`${API_BASE}/dex/v2/mint/hot`, { type: String(type) });
+      const params: Record<string, string> = {};
+      if (type !== undefined) params.type = String(type);
+      const data = await apiFetch<any>(`${API_BASE}/dex/v2/mint/hot`, params);
       const items = Array.isArray(data) ? data : data?.records ?? data?.list ?? [];
 
       if (!items.length) {
@@ -115,16 +118,20 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
 
   server.tool(
     'byreal_kline',
-    'Get K-line (candlestick) data for a token on Byreal.',
+    'Get K-line (candlestick) data for a token or pool on Byreal. Pass either poolAddress OR tokenAddress (token mint). Use interval for the candle period.',
     {
-      tokenAddress: z.string().describe('Token mint address'),
-      poolAddress: z.string().optional().describe('Pool address (optional, uses /kline/query if provided)'),
-      klineType: z.enum(['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']).default('1h').describe('K-line interval'),
+      poolAddress: z.string().optional().describe('Pool address — preferred when querying a specific trading pair'),
+      tokenAddress: z.string().optional().describe('Token mint address — use if you only have the token, not pool'),
+      interval: z.enum(['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']).default('1h').describe('Candle interval (e.g. "1h", "1d")'),
       startTime: z.number().optional().describe('Start timestamp (seconds)'),
       endTime: z.number().optional().describe('End timestamp (seconds)'),
     },
-    async ({ tokenAddress, poolAddress, klineType, startTime, endTime }) => {
-      const params: Record<string, string> = { tokenAddress, klineType };
+    async ({ poolAddress, tokenAddress, interval, startTime, endTime }) => {
+      if (!poolAddress && !tokenAddress) {
+        return { content: [{ type: 'text' as const, text: 'Error: provide either poolAddress or tokenAddress' }], isError: true };
+      }
+
+      const params: Record<string, string> = { klineType: interval };
       if (startTime) params.startTime = String(startTime);
       if (endTime) params.endTime = String(endTime);
 
@@ -133,6 +140,7 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
         params.poolAddress = poolAddress;
         data = await apiFetch<any>(`${API_BASE}/dex/v2/kline/query`, params);
       } else {
+        params.tokenAddress = tokenAddress!;
         data = await apiFetch<any>(`${API_BASE}/dex/v2/chart/k-line`, params);
       }
 
@@ -142,8 +150,7 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
         return { content: [{ type: 'text' as const, text: 'No K-line data found.' }] };
       }
 
-      // Format depends on API response; show raw if structured
-      const sym = KNOWN_TOKENS[tokenAddress]?.symbol ?? tokenAddress.slice(0, 8);
+      const sym = tokenAddress ? (KNOWN_TOKENS[tokenAddress]?.symbol ?? tokenAddress.slice(0, 8)) : poolAddress?.slice(0, 8);
       const lines = items.slice(-10).map((k: any) => {
         if (typeof k === 'object') {
           return `${k.time ?? k.t ?? '?'} O:${k.open ?? k.o} H:${k.high ?? k.h} L:${k.low ?? k.l} C:${k.close ?? k.c} V:${k.volume ?? k.v ?? '?'}`;
@@ -154,7 +161,7 @@ export function registerMarketTools(server: McpServer, chain: ChainClient) {
       return {
         content: [{
           type: 'text' as const,
-          text: `K-line ${sym} (${klineType}, last ${Math.min(items.length, 10)} candles):\n${lines.join('\n')}`,
+          text: `K-line ${sym} (${interval}, last ${Math.min(items.length, 10)} candles):\n${lines.join('\n')}`,
         }],
       };
     }
