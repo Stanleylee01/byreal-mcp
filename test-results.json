@@ -1,0 +1,158 @@
+[
+  {
+    "tool": "hot_tokens (no param)",
+    "ok": true,
+    "output": "No hot tokens found.",
+    "durationMs": 588
+  },
+  {
+    "tool": "hot_tokens (type=1 trending)",
+    "ok": true,
+    "output": "No hot tokens found.",
+    "durationMs": 106
+  },
+  {
+    "tool": "hot_tokens (type=2 new)",
+    "ok": true,
+    "output": "No hot tokens found.",
+    "durationMs": 108
+  },
+  {
+    "tool": "mint_prices (USDC)",
+    "ok": true,
+    "output": "Token Prices:\nUSDC (EPjFWd...): $0.999800",
+    "durationMs": 531
+  },
+  {
+    "tool": "mint_prices (SOL+USDC)",
+    "ok": true,
+    "output": "Token Prices:\nUSDC (EPjFWd...): $0.999800\nSOL (So1111...): $90.860000",
+    "durationMs": 231
+  },
+  {
+    "tool": "list_pools (default)",
+    "ok": true,
+    "output": "Byreal Pools (95 total, page 1/10):\n\nSOL/bbSOL | 87pbGHxigtjdMovzkAAFEe8XFVTETjDomoEFfpSFd2yD\n  TVL: $2,770,435\n  Vol 24h: $508\n  Fee APR 24h: 0.0033%\n  Fee Rate: 0.0500%\n  Price: $90.7900\n  24h Change: 0.43%\n\nXAUt0/USDT | 9KWAAyaYF7nmMWzirnBmVhE1q4YXPHcXjzfi6YreNtDY\n  TVL: $1,585,290\n  Vol 24h: $827,032\n  Fee APR 24h: 38.1326%\n  Fee Rate: 0.2000%\n  Price: $5105.7685\n  24h Change: -0.54%\n\nMNT/USDC | 8HPQzqMDoDcRDMh3Si75EGWh276QbcVrfHvrNFVPnW8s\n  TVL: $1,250,803\n  Vol 24h: $342,279\n  Fee APR 24h: 30.2225%\n  Fee Rate: 0.3000%\n  Price: $0.7196\n  24h Change: 2.03%\n\nPYBOBO/USDC | 86zmTigoureLp9JwS2m8NghfWxbo6SJe1moHLqM2xVkt\n  TVL: $1,240,086\n  Vol 24h: $3,243,993\n  Fee APR 24h: 9.5515%\n  Fee Rate: 0.0100%\n  Price: $0.0008\n  24h Change: 0.08%\n\nUSDC/USDT | 23XoPQqGw9WMsLoqTu8HMzJLD6RnXsufbKyWPLJywsCT\n  TVL: $1,084,372\n  Vol 24h: $509,019\n  Fee APR 24h: 1.7135%\n  Fee Rate: 0.0100%\n  Price: $0.9999\n  24h Change: -0.02%\n\nUSDC/BIRB | 4nwnu5wxhGxZ6ndw5SRBu2N5RdC5wq4FDr6bUJfARFpr\n  TVL: $475,815\n  Vol 24h: $197,058\n  Fee APR 24h: 45.4980%\n  Fee Rate: 0.3000%\n  Price: $0.9999\n  24h Change: 4.73%\n\nSKR/USDC | H5zhyinHqif8sL6fkSKyYei1Qjuw2kcK9tN4EtxrcvfN\n  TVL: $475,566\n  Vol 24h: $177,996\n  Fee APR 24h: 34.9926%\n  Fee Rate: 0.2500%\n  Price: $0.0244\n  24h Change: 5.86%\n\nTSLAx/USDC | 6FQQyf7UcyU86TZC1cmAcfC4a18SJyDggEKtQfTJWmfs\n  TVL: $469,345\n  Vol 24h: $337,471\n  Fee APR 24h: 52.4832%\n  Fee Rate: 0.2000%\n  Price: $402.5000\n  24h Change: 0.46%\n\nSNS/USDC | DKP8pfijS9pwqhBF6W1dx8fc81jFJuSirhhw3525YN3g\n  TVL: $466,237\n  Vol 24h: $543\n  Fee APR 24h: 0.0851%\n  Fee Rate: 0.2000%\n  Price: $0.0014\n  24h Change: 0.57%\n\nFIGHT/USDT | GueLj9zGt35QNiJW4RWf7WvtJi1rid9hPYpMP25wuR5A\n  TVL: $451,313\n  Vol 24h: $95,769\n  Fee APR 24h: 15.2250%\n  Fee Rate: 0.2000%\n  Price: $0.0057\n  24h Change: -4.83%",
+    "durationMs": 286
+  },
+  {
+    "tool": "list_pools (paginated)",
+    "ok": true,
+    "output": "Byreal Pools (95 total, page 1/10):\n\nSOL/bbSOL | 87pbGHxigtjdMovzkAAFEe8XFVTETjDomoEFfpSFd2yD\n  TVL: $2,770,435\n  Vol 24h: $508\n  Fee APR 24h: 0.0033%\n  Fee Rate: 0.0500%\n  Price: $90.7900\n  24h Change: 0.43%\n\nXAUt0/USDT | 9KWAAyaYF7nmMWzirnBmVhE1q4YXPHcXjzfi6YreNtDY\n  TVL: $1,585,290\n  Vol 24h: $827,032\n  Fee APR 24h: 38.1326%\n  Fee Rate: 0.2000%\n  Price: $5105.7685\n  24h Change: -0.54%\n\nMNT/USDC | 8HPQzqMDoDcRDMh3Si75EGWh276QbcVrfHvrNFVPnW8s\n  TVL: $1,250,803\n  Vol 24h: $342,279\n  Fee APR 24h: 30.2225%\n  Fee Rate: 0.3000%\n  Price: $0.7196\n  24h Change: 2.03%\n\nPYBOBO/USDC | 86zmTigoureLp9JwS2m8NghfWxbo6SJe1moHLqM2xVkt\n  TVL: $1,240,086\n  Vol 24h: $3,243,993\n  Fee APR 24h: 9.5515%\n  Fee Rate: 0.0100%\n  Price: $0.0008\n  24h Change: 0.08%\n\nUSDC/USDT | 23XoPQqGw9WMsLoqTu8HMzJLD6RnXsufbKyWPLJywsCT\n  TVL: $1,084,372\n  Vol 24h: $509,019\n  Fee APR 24h: 1.7135%\n  Fee Rate: 0.0100%\n  Price: $0.9999\n  24h Change: -0.02%",
+    "durationMs": 184
+  },
+  {
+    "tool": "market_overview",
+    "ok": true,
+    "output": "📊 Byreal Market Overview\n\nSOL: $90.8496\nbbSOL: $103.2346\nUSDT: $1.0001",
+    "durationMs": 452
+  },
+  {
+    "tool": "global_overview",
+    "ok": true,
+    "output": "📊 Byreal Global Overview\nTVL: $13,458,323 (-1.33%)\nVolume 24h: $7,756,015 (0.34%)\nFees 24h: $8,189 (0.35%)\nAll-time Volume: $2,320,793,257\nAll-time Fees: $2,328,180",
+    "durationMs": 105
+  },
+  {
+    "tool": "known_tokens",
+    "ok": true,
+    "output": "Known Byreal tokens:\n\nUSDC: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v (6 decimals)\nUSDT: Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB (6 decimals)\nSOL: So11111111111111111111111111111111111111112 (9 decimals)\nbbSOL: Bybit2vBJGhPF52GBdNaQfUJ6ZpThSgHBobjWZpLPb4B (9 decimals)\nstSOL: 7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj (9 decimals)\nJitoSOL: J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn (9 decimals)\nmSOL: mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So (9 decimals)\nWETH: 7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs (8 decimals)\nWBTC: 3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh (8 decimals)\nBONK: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 (5 decimals)\nJUP: JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN (6 decimals)\nPYTH: HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3 (6 decimals)\nJTO: jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL (9 decimals)\nWEN: WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk (5 decimals)\nRENDER: rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof (8 decimals)\nWIF: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm (6 decimals)\nTNSR: TNSRxcUxoT9xBG3de7PiJyTDYu7kskLqcpddxnEJAS6 (9 decimals)\nMNT: 4SoQ8UkWfeDH47T56PA53CZCeW4KytYCiU65CwBWoJUt (9 decimals)\nXAUt0: AymATz4TCL9sWNEEV9Kvyz45CHVhDZ6kUgjTJPzLpU9P (6 decimals)\nxTSLA: XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB (8 decimals)\nxNVDA: Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh (8 decimals)",
+    "durationMs": 1
+  },
+  {
+    "tool": "wallet_status",
+    "ok": true,
+    "output": "⚠️ No wallet found.\n\nRun byreal_wallet_setup to create one.",
+    "durationMs": 2
+  },
+  {
+    "tool": "wallet_setup",
+    "ok": true,
+    "output": "✅ Wallet Created!\n\nAddress: TLZdR21WuoyHMGmgL9zM9fChKAGejRbvJjWTJdsN41Y\n\n⚠️ IMPORTANT — Back up your wallet file NOW:\nPrivate key saved at: ~/.byreal-mcp/wallet.json\n\n🔴 If you lose this file, your funds are PERMANENTLY UNRECOVERABLE.\n\nNext steps:\n1. Back up ~/.byreal-mcp/wallet.json to a secure location\n2. Send SOL to this address for gas fees (~0.01 SOL minimum)\n3. Send USDC for trading/LP operations\n4. Use byreal_wallet_status to check your balance",
+    "durationMs": 57
+  },
+  {
+    "tool": "list_positions (open)",
+    "ok": true,
+    "output": "No positions found for 8r9bADv7UJ7mXgWZXWjZ6R4Ez1Kwdub1AEr3q21sQtVW",
+    "durationMs": 105
+  },
+  {
+    "tool": "list_positions (status=0)",
+    "ok": true,
+    "output": "No positions found for 8r9bADv7UJ7mXgWZXWjZ6R4Ez1Kwdub1AEr3q21sQtVW",
+    "durationMs": 105
+  },
+  {
+    "tool": "list_positions (closed)",
+    "ok": true,
+    "output": "No positions found for 8r9bADv7UJ7mXgWZXWjZ6R4Ez1Kwdub1AEr3q21sQtVW",
+    "durationMs": 106
+  },
+  {
+    "tool": "position_overview",
+    "ok": true,
+    "output": "Position Overview for 8r9bADv7UJ7mXgWZXWjZ6R4Ez1Kwdub1AEr3q21sQtVW:\n  currentPositionsCount: 0",
+    "durationMs": 103
+  },
+  {
+    "tool": "top_farmers",
+    "ok": true,
+    "output": "🏆 Top Farmers (3656 total):\n\n#1 All Pools\n  Farmer: 8pYTu2xY1WemzLMhiuM7UyxHvweEmJVPRfbjDKghMViG\n  PnL: $-2161491.58\n  Liquidity: $4,652,983\n  Fees: $136226.23\n  Bonus: $105.06\n  Avg APR: 0.00%\n  Positions: 29 open, 73 closed\n  Copies: 371 | Follows: 0\n  Avg Age: 0.0d\n\n#2 All Pools\n  Farmer: 57Ze6q4W9EBNp3JygSHXRksoyvtw1i9Bgb3pwTc2S7Jp\n  PnL: $204022.84\n  Liquidity: $1,154,390\n  Fees: $49112.49\n  Bonus: $24.43\n  Avg APR: 0.00%\n  Positions: 2 open, 0 closed\n  Copies: 203 | Follows: 0\n  Avg Age: 0.1d\n\n#3 All Pools\n  Farmer: 2Cq2RNFFxxPXL7teNQAji1beA2vFbBDYW5BGPBFvoN9m\n  PnL: $-10791.29\n  Liquidity: $478,870\n  Fees: $20946.16\n  Bonus: $93.64\n  Avg APR: 0.00%\n  Positions: 10 open, 3 closed\n  Copies: 225 | Follows: 0\n  Avg Age: 0.1d\n\n#4 All Pools\n  Farmer: 33z76xPq659Qq8ADS8dzgcBEZfTQKnPbeuMjw6VNoUaw\n  PnL: $-140564.53\n  Liquidity: $465,504\n  Fees: $2101.76\n  Bonus: $0.00\n  Avg APR: 0.00%\n  Positions: 3 open, 0 closed\n  Copies: 7 | Follows: 0\n  Avg Age: 0.2d\n\n#5 All Pools\n  Farmer: D9bpPfFu2xPZJdKDKV8iJLyhhKZuaucCEcsR7cVNAYjP\n  PnL: $-174508.49\n  Liquidity: $431,418\n  Fees: $1442.39\n  Bonus: $1.15\n  Avg APR: 0.00%\n  Positions: 3 open, 1 closed\n  Copies: 18 | Follows: 0\n  Avg Age: 0.0d",
+    "durationMs": 113
+  },
+  {
+    "tool": "top_positions",
+    "ok": true,
+    "output": "MCP error -32602: Input validation error: Invalid arguments for tool byreal_top_positions: [\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"string\",\n    \"received\": \"undefined\",\n    \"path\": [\n      \"poolAddress\"\n    ],\n    \"message\": \"Required\"\n  }\n]",
+    "durationMs": 2
+  },
+  {
+    "tool": "unclaimed_fees",
+    "ok": true,
+    "output": "MCP error -32602: Input validation error: Invalid arguments for tool byreal_unclaimed_fees: [\n  {\n    \"code\": \"invalid_type\",\n    \"expected\": \"string\",\n    \"received\": \"undefined\",\n    \"path\": [\n      \"userAddress\"\n    ],\n    \"message\": \"Required\"\n  }\n]",
+    "durationMs": 1
+  },
+  {
+    "tool": "order_history",
+    "ok": true,
+    "output": "No orders found for 8r9bADv7UJ7mXgWZXWjZ6R4Ez1Kwdub1AEr3q21sQtVW",
+    "durationMs": 110
+  },
+  {
+    "tool": "order_history (page=1)",
+    "ok": true,
+    "output": "No orders found for 8r9bADv7UJ7mXgWZXWjZ6R4Ez1Kwdub1AEr3q21sQtVW",
+    "durationMs": 105
+  },
+  {
+    "tool": "swap_quote (0.01 SOL string lamports)",
+    "ok": true,
+    "output": "📊 Byreal Swap Quote\n0.01 SOL → 0.908665 USDC\nRate: 1 SOL = 90.866500 USDC\nMin received: 0.904121 USDC (slippage 0.5%)\nPrice impact: 0.0403%\nRouter: AMM\nPool: 9GTj99g9tbz9U6UYDsX6YeRTgUnkYG6GTnHv3qLa5aXq\nEstimated CU: 240495",
+    "durationMs": 103
+  },
+  {
+    "tool": "easy_swap dryRun SOL→USDC",
+    "ok": true,
+    "output": "📊 Quote: 0.01 SOL → 0.908665 USDC\nRate: 1 SOL = 90.866500 USDC\nMin received: 0.904121 USDC (slippage 0.5%)\nPrice impact: 0.0403%\nRouter: AMM\n\n🔍 Dry-run mode — no transaction executed.\nTo execute: call again with dryRun=false",
+    "durationMs": 104
+  },
+  {
+    "tool": "easy_swap dryRun USDC→SOL",
+    "ok": true,
+    "output": "📊 Quote: 1 USDC → 0.010996 SOL\nRate: 1 USDC = 0.010996 SOL\nMin received: 0.010941 SOL (slippage 0.5%)\nPrice impact: 0.0402%\nRouter: AMM\n\n🔍 Dry-run mode — no transaction executed.\nTo execute: call again with dryRun=false",
+    "durationMs": 103
+  },
+  {
+    "tool": "copyfarmer_overview",
+    "ok": true,
+    "output": "CopyFarmer Overview:\ntotalFeeUsd: 2328179.756240693289610281\ntotalIncentiveUsd: 161937.801530659\ntotalBonusUsd: 101484.585259591336167007",
+    "durationMs": 104
+  },
+  {
+    "tool": "catalog",
+    "ok": true,
+    "output": "🗂️  Byreal MCP Tool Catalog (31 tools)\n\n── Pools ──\n  byreal_list_pools\n    List Byreal CLMM pools sorted by TVL, volume, fees, or APR.\n    Params: sortField, sortType, page, pageSize\n  byreal_pool_info\n    Get detailed info for specific pool(s) by address (up to 10 at once).\n    Params: poolIds: string[]\n  byreal_pool_live_price\n    Get live price for a token pair via Byreal Router swap quote.\n    Params: inputMint, outputMint\n  byreal_pool_analyze\n    Comprehensive pool analysis: volatility, range APR estimates, in-range likelihood, risk factors, and investment projection. Best tool for deciding LP price bounds.\n    Params: poolAddress, amountUsd (default 1000), ranges (default \"1,2,3,5,8,10,15,20,35,50\")\n\n── Positions ──\n  byreal_list_positions\n    List all CLMM liquidity positions for a wallet. Shows pair, PnL, earned fees, deposit, age, status.\n    Params: walletAddress, page, pageSize\n  byreal_calculate_apr\n    Estimate APR for a hypothetical position on a pool.\n    Params: poolAddress, depositUsd\n  byreal_position_analyze\n    Analyze an existing CLMM position: performance, range health, pool context, unclaimed fees.\n    Params: walletAddress, nftMint\n\n── Swap ──\n  byreal_swap_quote\n    Get a live swap quote (no wallet). Returns expected output, price impact, min received, pools used.\n    Params: inputMint, outputMint, amount (raw units), slippageBps\n  byreal_swap_execute\n    Execute a swap on Byreal. Requires wallet configured. Signs and sends transaction.\n    Params: inputMint, outputMint, amount (raw units), slippageBps\n  byreal_easy_swap\n    Human-friendly swap with dry-run support. Auto-resolves symbols, converts amounts. Includes error recovery suggestions.\n    Params: fromToken (symbol or mint), toToken (symbol or mint), amount (e.g. \"1.5\"), slippageBps, dryRun (preview only)\n\n── Tokens ──\n  byreal_list_tokens\n    List known tokens on Byreal with prices.\n    Params: page, pageSize, sortField, sortType\n  byreal_token_info\n    Get info for a specific token by mint address.\n    Params: mint\n\n── Market ──\n  byreal_market_overview\n    Get global Byreal market overview: total TVL, volume, top pools.\n    Params: (none)\n  byreal_pool_klines\n    Get OHLCV kline (candlestick) data for a pool.\n    Params: poolAddress, interval (1m/5m/15m/1h/4h/1d), limit\n  byreal_dynamic_fee\n    Get current dynamic fee rates for Byreal pools.\n    Params: (none)\n\n── Liquidity ──\n  byreal_open_position\n    Open a new CLMM LP position. Supports amountUsd for auto token split based on price range. Returns unsigned tx.\n    Params: poolAddress, priceLower, priceUpper, baseToken, baseAmount OR amountUsd (auto-split), userAddress, slippage\n  byreal_close_position\n    Close a CLMM position (remove all liquidity). Returns unsigned tx.\n    Params: nftMint, userAddress, slippage, closePosition\n  byreal_add_liquidity\n    Add liquidity to an existing position or create a new one. Requires wallet.\n    Params: poolAddress, tokenAAmount, tokenBAmount, priceLower, priceUpper, slippageBps\n  byreal_remove_liquidity\n    Remove liquidity from a position (partial or full). Requires wallet.\n    Params: nftMint, percent (0-100), slippageBps\n  byreal_collect_fees\n    Collect unclaimed fees from a position. Requires wallet.\n    Params: nftMint\n\n── CopyFarmer ──\n  byreal_top_farmers\n    List top liquidity farmers on Byreal by earnings.\n    Params: page, pageSize, poolAddress (optional)\n  byreal_top_positions\n    List top-performing positions in a pool for copy trading. Includes inRange status (whether earning fees). Use to discover copy targets.\n    Params: poolAddress (required), page, pageSize, sortField (liquidity|apr|earned|pnl|copies|bonus|closeTime), sortType, status (0=open, 1=closed)\n  byreal_copy_position\n    Copy an existing position with same price range. Records referral on-chain for copy bonus. Supports amountUsd for auto token split.\n    Params: positionAddress, userAddress, baseToken (A|B), baseAmount OR amountUsd (auto-split), slippage\n  byreal_copyfarmer_overview\n    Get CopyFarmer program global stats — total copies, followers, aggregate performance.\n    Params: (none)\n  byreal_farmer_positions\n    Get positions of a specific farmer by wallet address.\n    Params: walletAddress, page, pageSize\n\n── Orders ──\n  byreal_list_orders\n    List limit orders for a wallet.\n    Params: walletAddress, page, pageSize\n  byreal_create_order\n    Create a limit order. Requires wallet.\n    Params: inputMint, outputMint, inputAmount, outputAmount, expireAt\n  byreal_cancel_order\n    Cancel a limit order. Requires wallet.\n    Params: orderId\n\n── Wallet ──\n  byreal_wallet_balance\n    Check SOL and token balances for a wallet.\n    Params: walletAddress\n  byreal_wallet_status\n    Check if a wallet keypair is configured in the MCP server.\n    Params: (none)\n\n── Discovery ──\n  byreal_catalog\n    List all available Byreal MCP tools with descriptions and parameters. Use for agent discovery.\n    Params: search (optional keyword)\n",
+    "durationMs": 2
+  }
+]

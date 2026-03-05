@@ -85,7 +85,7 @@ export function registerPositionTools(server: McpServer, chain: ChainClient) {
     'Estimate APR for a hypothetical position on a Byreal pool. Uses pool volume and fee data.',
     {
       poolAddress: z.string().describe('Pool address'),
-      depositUsd: z.number().positive().describe('Deposit amount in USD'),
+      depositUsd: z.number().positive().default(1000).describe('Deposit amount in USD (default: 1000)'),
     },
     async ({ poolAddress, depositUsd }) => {
       // Fetch pool info via pool details GET endpoint

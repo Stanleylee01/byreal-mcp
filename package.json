@@ -1,7 +1,7 @@
 {
   "name": "@byreal/mcp-server",
-  "version": "0.6.3",
-  "description": "Byreal DEX MCP Server — expose Byreal CLMM operations to AI agents",
+  "version": "0.6.4",
+  "description": "Byreal DEX MCP Server \u2014 expose Byreal CLMM operations to AI agents",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
